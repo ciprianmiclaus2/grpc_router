@@ -1,0 +1,50 @@
+syntax = "proto3";
+
+package grpcrouter;
+
+
+option java_package = "com.grpcrouter.service";
+option java_multiple_files = true;
+
+
+service GRPCRouterService {
+
+    rpc RegisterService(ServiceRegistrationRequest) returns (ServiceRegistrationResponse) {}
+
+    rpc DeregisterService(ServiceDeregistrationRequest) returns (ServiceDeregistrationResponse) {}
+
+    rpc GetRegisteredService(GetRegisteredServiceRequest) returns (GetRegisteredServiceResponse) {}
+
+}
+
+
+message ServiceRegistrationRequest {
+    string service_id = 1;
+    string host = 2;
+    int32 port = 3;
+}
+
+
+message ServiceRegistrationResponse {
+    string service_token = 1;
+}
+
+
+message ServiceDeregistrationRequest {
+    string service_id = 1;
+    string service_token = 2;
+}
+
+
+message ServiceDeregistrationResponse {
+
+}
+
+message GetRegisteredServiceRequest {
+    string service_id = 1;
+}
+
+message GetRegisteredServiceResponse {
+    string host = 1;
+    int32 port = 2;
+}

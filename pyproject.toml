@@ -1,0 +1,49 @@
+[project]
+name = "grpcrouter"
+version = "0.1.0"
+description = "A simple grpc router to establish a simple grpc mesh."
+authors = [{name = "Ciprian Miclaus", email = "ciprianm@gmail.com"}]
+readme = "README.md"
+license = {file = "LICENSE"}
+requires-python = ">=3.8"
+classifiers=[
+    'Development Status :: 4 - Beta',
+    'Intended Audience :: Developers',
+    'License :: OSI Approved :: MIT License',
+    'Natural Language :: English',
+    'Programming Language :: Python :: 3',
+    'Programming Language :: Python :: 3.8',
+    'Programming Language :: Python :: 3.9',
+    'Programming Language :: Python :: 3.10',
+    'Programming Language :: Python :: 3.11',
+    'Programming Language :: Python :: 3.12',
+]
+
+dependencies = [
+    "grpcio"
+]
+
+
+[project.optional-dependencies]
+test = [
+    "pytest",
+    ]
+
+dev = [
+    "grpcio-tools",
+    "tox",
+    "pre-commit",
+    "virtualenv",
+    "pip",
+    "twine",
+    "toml"
+]
+
+[project.urls]
+homepage = "https://github.com/ciprianmiclaus2/grpc_router"
+documentation = "https://ciprianmiclaus2.github.io/grpc_router/"
+repository = "https://github.com/ciprianmiclaus2/grpc_router"
+history = "https://github.com/ciprianmiclaus2/grpc_router/blob/main/HISTORY.md"
+
+[tool.setuptools]
+packages = ["grpc_router"]
