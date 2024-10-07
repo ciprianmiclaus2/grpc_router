@@ -3,18 +3,54 @@ from concurrent.futures import ThreadPoolExecutor
 import grpc
 
 from grpc_router.stubs.grpc_router_service_pb2_grpc import add_GRPCRouterServiceServicer_to_server, GRPCRouterServiceServicer
+from grpc_router.stubs.grpc_router_service_pb2 import (
+    ServiceRegistrationResponse,
+    ServiceDeregistrationResponse,
+    GetRegisteredServiceResponse,
+)
+
+from grpc_router.core.register import ServiceRegister
 
 
 class GRPCRouterServer(GRPCRouterServiceServicer):
 
+    def __init__(self):
+        self._register = ServiceRegister()
+
     def RegisterService(self, request, context):
-        print("register service")
+        service_token, error = self._register.register_service(
+            service_id=request.service_id,
+            host=request.host,
+            port=request.port
+        )
+        return ServiceRegistrationResponse(
+            service_token=service_token,
+            error=error
+        )
 
     def DeregisterService(self, request, context):
-        print("deregister service")
+        error = self._register.deregister_service(
+            service_id=request.service_id,
+            service_token=request.service_token
+        )
+        return ServiceDeregistrationResponse(
+            error=error
+        )
 
     def GetRegisteredService(self, request, context):
-        print("get registered service")
+        service = self._register.get_service(
+            service_id=request.service_id
+        )
+        if service is None:
+            return GetRegisteredServiceResponse(
+                error="No service available."
+            )
+        return GetRegisteredServiceResponse(
+            service_id=service.service_id,
+            host=service.host,
+            port=service.port,
+            error=''
+        )
 
 
 def serve(hostname: str="[::]", port: int=50034, max_workers: int=10):

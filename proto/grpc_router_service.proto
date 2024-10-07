@@ -27,6 +27,7 @@ message ServiceRegistrationRequest {
 
 message ServiceRegistrationResponse {
     string service_token = 1;
+    string error = 2;
 }
 
 
@@ -37,7 +38,7 @@ message ServiceDeregistrationRequest {
 
 
 message ServiceDeregistrationResponse {
-
+    string error = 1;
 }
 
 message GetRegisteredServiceRequest {
@@ -45,6 +46,8 @@ message GetRegisteredServiceRequest {
 }
 
 message GetRegisteredServiceResponse {
-    string host = 1;
-    int32 port = 2;
+    string service_id = 1;
+    string host = 2;
+    int32 port = 3;
+    string error = 4;
 }
