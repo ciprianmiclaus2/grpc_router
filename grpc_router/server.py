@@ -20,8 +20,8 @@ class GRPCRouterServer(GRPCRouterServiceServicer):
     def RegisterService(self, request, context):
         service_token, error = self._register.register_service(
             service_id=request.service_id,
-            host=request.host,
-            port=request.port
+            host=request.service_endpoint.host,
+            port=request.service_endpoint.port
         )
         return ServiceRegistrationResponse(
             service_token=service_token,
@@ -45,12 +45,12 @@ class GRPCRouterServer(GRPCRouterServiceServicer):
             return GetRegisteredServiceResponse(
                 error="No service available."
             )
-        return GetRegisteredServiceResponse(
-            service_id=service.service_id,
-            host=service.host,
-            port=service.port,
-            error=''
-        )
+        response = GetRegisteredServiceResponse()
+        response.service_id = service.service_id
+        response.service_endpoint.host = service.host
+        response.service_endpoint.port = service.port
+        response.error = ''
+        return response
 
 
 def serve(hostname: str="[::]", port: int=50034, max_workers: int=10):

@@ -55,24 +55,20 @@ class GRPCRouterClient:
         return GRPCRouterServiceStub(self.channel)
 
     def register_service(self, service_id: str, host: str, port: int) -> str:
-        res = self.stub.RegisterService(
-            ServiceRegistrationRequest(
-                service_id=service_id,
-                host=host,
-                port=port
-            )
-        )
+        request = ServiceRegistrationRequest()
+        request.service_id = service_id
+        request.service_endpoint.host = host
+        request.service_endpoint.port = port
+        res = self.stub.RegisterService(request)
         if res.error:
             raise ValueError(res.error)
         return res.service_token
 
     def deregister_service(self, service_id: str, service_token: str):
-        res = self.stub.DeregisterService(
-            ServiceDeregistrationRequest(
-                service_id=service_id,
-                service_token=service_token
-            )
-        )
+        request = ServiceDeregistrationRequest()
+        request.service_id = service_id
+        request.service_token = service_token
+        res = self.stub.DeregisterService(request)
         if res.error:
             raise ValueError(res.error)
 
@@ -82,4 +78,4 @@ class GRPCRouterClient:
         )
         if res.error:
             raise ValueError(res.error)
-        return res.host, res.port
+        return res.service_endpoint.host, res.service_endpoint.port

@@ -36,10 +36,15 @@ service GRPCRouterService {
 }
 
 
+message ServiceEndpoint {
+    string host = 1;  // hostname of the service
+    int32 port = 2;  // port of the service
+}
+
+
 message ServiceRegistrationRequest {
     string service_id = 1;  // identifier of the service that the clients will use
-    string host = 2;  // hostname of the service
-    int32 port = 3;  // port of the service
+    ServiceEndpoint service_endpoint = 2;
 }
 
 
@@ -65,7 +70,6 @@ message GetRegisteredServiceRequest {
 
 message GetRegisteredServiceResponse {
     string service_id = 1;
-    string host = 2;
-    int32 port = 3;
-    string error = 4;
+    ServiceEndpoint service_endpoint = 2;
+    string error = 3;
 }

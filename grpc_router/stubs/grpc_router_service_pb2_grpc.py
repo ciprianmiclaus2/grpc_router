@@ -55,19 +55,37 @@ class GRPCRouterServiceServicer(object):
     """Missing associated documentation comment in .proto file."""
 
     def RegisterService(self, request, context):
-        """Missing associated documentation comment in .proto file."""
+        """Register a service endpoint
+
+        Called by a service that wants to advertise its services to clients.
+        Provides a service_id which ideally should be a dot separated namespace representing
+        the service but it can be anything, e.g.: org.suborg.scope1.service1
+        It also has information about how clients can connect directly to the service (ie host/port)
+        The service gets back a service_token which it can use to communicate with the grpc router.
+        """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
     def DeregisterService(self, request, context):
-        """Missing associated documentation comment in .proto file."""
+        """Deregister a service endpoint
+
+        Called by a service when it exits and it no longer serves client requests.
+        The service should pass its service_token which was obtained at registration.
+        """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
     def GetRegisteredService(self, request, context):
-        """Missing associated documentation comment in .proto file."""
+        """Get the detail of a service
+
+        Returns the details of a registered service when called by a client.
+        The client then can connect directly to that service.
+        The client specifies the service_id which is service register for.
+        When multiple services are registered for the same service_id, they are returned in a simple
+        round-robin fashion.
+        """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
