@@ -1,20 +1,53 @@
 import grpc
-from typing import Optional
+import json
+from typing import Any, Optional
 
 from grpc_router.stubs.grpc_router_service_pb2_grpc import GRPCRouterServiceStub
-from grpc_router.stubs.grpc_router_service_pb2 import GetRegisteredServiceRequest, ServiceDeregistrationRequest, ServiceRegistrationRequest
+from grpc_router.stubs.grpc_router_service_pb2 import (
+    GetRegisteredServiceRequest,
+    ServiceDeregistrationRequest,
+    ServiceRegistrationRequest,
+)
 
 
 class GRPCRouterClient:
-    def __init__(self, host: str, port: int):
+
+    DEFAULT_GRPC_SERVICE_CONFIG = {
+        "methodConfig": [{
+            "name": [{"service": ""}],
+            "retryPolicy": {
+                "maxAttempts": 5,
+                "initialBackoff": "5s",
+                "maxBackoff": "30s",
+                "backoffMultiplier": 2,
+                "retryableStatusCodes": [
+                    "ABORTED", "CANCELLED", "DATA_LOSS", "DEADLINE_EXCEEDED",
+                    "FAILED_PRECONDITION", "INTERNAL", "RESOURCE_EXHAUSTED",
+                    "UNAVAILABLE", "UNKNOWN",
+                ]
+            }
+        }]
+    }
+
+    def __init__(self, host: str, port: int, grpc_service_config: Optional[dict[str, Any]]=None):
         self.host = host
         self.port = port
         self._channel = None
+        self._grpc_service_config = grpc_service_config if grpc_service_config is not None else self.DEFAULT_GRPC_SERVICE_CONFIG
 
     @property
     def channel(self):
         if self._channel is None:
-            self._channel = grpc.insecure_channel(f'{self.host}:{self.port}')
+            if self._grpc_service_config:
+                options = [
+                    ("grpc.service_config", json.dumps(self._grpc_service_config))
+                ]
+            else:
+                options = None
+            self._channel = grpc.insecure_channel(
+                f'{self.host}:{self.port}',
+                options=options
+            )
         return self._channel
 
     @property
