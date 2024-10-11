@@ -20,7 +20,8 @@ classifiers=[
 ]
 
 dependencies = [
-    "grpcio"
+    "grpcio",
+    "protobuf",
 ]
 
 
