@@ -8,7 +8,7 @@ class ServiceRegister:
 
     def __init__(self):
         self._register: dict[str, list[Service]] = {}
-        self._service_counters = dict[str, int]
+        self._service_counters: dict[str, int] = {}
 
     def register_service(self, service_id: str, host: str, port: int) -> tuple[str, str]:
         error_str = ''
@@ -39,7 +39,7 @@ class ServiceRegister:
 
     def get_service(self, service_id: str) -> Optional[Service]:
         entry = self._register.get(service_id)
-        if entry is not None:
+        if entry:
             # separate this simplistic round-robin in its own allocation algo class
             counter = self._service_counters.get(service_id, 0)
             self._service_counters[service_id] = counter + 1
