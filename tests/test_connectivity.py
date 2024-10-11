@@ -61,6 +61,9 @@ def test_multiple_services_round_robin(grpc_router_server):
     host, port = client.get_service(service_id)
     assert host == "myhost3.mydomain.com"
     assert port == 9992
+    host, port = client.get_service(service_id)
+    assert host == "myhost1.mydomain.com"
+    assert port == 9990
 
     client.deregister_service(
         service_id=service_id,
