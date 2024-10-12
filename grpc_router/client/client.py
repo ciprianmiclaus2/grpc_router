@@ -60,22 +60,16 @@ class GRPCRouterClient:
         request.service_endpoint.host = host
         request.service_endpoint.port = port
         res = self.stub.RegisterService(request)
-        if res.error:
-            raise ValueError(res.error)
         return res.service_token
 
     def deregister_service(self, service_id: str, service_token: str):
         request = ServiceDeregistrationRequest()
         request.service_id = service_id
         request.service_token = service_token
-        res = self.stub.DeregisterService(request)
-        if res.error:
-            raise ValueError(res.error)
+        self.stub.DeregisterService(request)
 
     def get_service(self, service_id: str) -> tuple[str, int]:
         res = self.stub.GetRegisteredService(
             GetRegisteredServiceRequest(service_id=service_id)
         )
-        if res.error:
-            raise ValueError(res.error)
         return res.service_endpoint.host, res.service_endpoint.port

@@ -17,39 +17,88 @@ class GRPCRouterServer(GRPCRouterServiceServicer):
     def __init__(self):
         self._register = ServiceRegister()
 
+    def _validate_RegisterService(self, request, context):
+        service_id = request.service_id
+        if not service_id:
+            context.abort(
+                grpc.StatusCode.INVALID_ARGUMENT,
+                "The service_id cannot be empty."
+            )
+        host = request.service_endpoint.host
+        if not host:
+            context.abort(
+                grpc.StatusCode.INVALID_ARGUMENT,
+                "The host cannot be empty."
+            )
+
+        port = request.service_endpoint.port
+        if port <= 0:
+            context.abort(
+                grpc.StatusCode.INVALID_ARGUMENT,
+                "The port cannot be negative or zero."
+            )
+
     def RegisterService(self, request, context):
+        response = ()
+        self._validate_RegisterService(request, context)
         service_token, error = self._register.register_service(
             service_id=request.service_id,
             host=request.service_endpoint.host,
             port=request.service_endpoint.port
         )
         return ServiceRegistrationResponse(
-            service_token=service_token,
-            error=error
+            service_token=service_token
         )
 
+    def _validate_DeregisterService(self, request, context) -> bool:
+        service_id = request.service_id
+        if not service_id:
+            context.abort(
+                grpc.StatusCode.INVALID_ARGUMENT,
+                "The service_id cannot be empty."
+            )
+        service_token = request.service_token
+        if not service_token:
+            context.abort(
+                grpc.StatusCode.INVALID_ARGUMENT,
+                "The service_context cannot be empty."
+            )
+
     def DeregisterService(self, request, context):
+        self._validate_DeregisterService(request, context)
         error = self._register.deregister_service(
             service_id=request.service_id,
             service_token=request.service_token
         )
-        return ServiceDeregistrationResponse(
-            error=error
-        )
+        if error:
+            context.abort(
+                grpc.StatusCode.NOT_FOUND,
+                "The service_id/service_context combination is not registered."
+            )
+        return ServiceDeregistrationResponse()
+
+    def _validate_GetRegisteredService(self, request, context) -> bool:
+        service_id = request.service_id
+        if not service_id:
+            context.abort(
+                grpc.StatusCode.INVALID_ARGUMENT,
+                "The service_id cannot be empty."
+            )
 
     def GetRegisteredService(self, request, context):
+        self._validate_GetRegisteredService(request, context)
         service = self._register.get_service(
             service_id=request.service_id
         )
         if service is None:
-            return GetRegisteredServiceResponse(
-                error="No service available."
+            context.abort(
+                grpc.StatusCode.NOT_FOUND,
+                "The service_id has no registered instances."
             )
         response = GetRegisteredServiceResponse()
         response.service_id = service.service_id
         response.service_endpoint.host = service.host
         response.service_endpoint.port = service.port
-        response.error = ''
         return response
 
 

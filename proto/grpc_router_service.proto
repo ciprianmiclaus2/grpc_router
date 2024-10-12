@@ -50,7 +50,6 @@ message ServiceRegistrationRequest {
 
 message ServiceRegistrationResponse {
     string service_token = 1;
-    string error = 2;
 }
 
 
@@ -61,7 +60,6 @@ message ServiceDeregistrationRequest {
 
 
 message ServiceDeregistrationResponse {
-    string error = 1;
 }
 
 message GetRegisteredServiceRequest {
@@ -71,5 +69,4 @@ message GetRegisteredServiceRequest {
 message GetRegisteredServiceResponse {
     string service_id = 1;
     ServiceEndpoint service_endpoint = 2;
-    string error = 3;
 }

@@ -1,3 +1,5 @@
+import grpc
+
 from grpc_router.client.client import GRPCRouterClient
 import pytest
 
@@ -6,9 +8,10 @@ def test_connectivity(grpc_router_server):
     service_id = "my.test.service"
     client = GRPCRouterClient("localhost", 7654)
 
-    with pytest.raises(ValueError) as exc:
+    with pytest.raises(grpc.RpcError) as exc:
         client.get_service(service_id)
-    assert str(exc.value) == "No service available."
+    assert exc.value.code() == grpc.StatusCode.NOT_FOUND
+    assert exc.value.details() == "The service_id has no registered instances."
 
     token = client.register_service(
         service_id=service_id,
@@ -26,9 +29,10 @@ def test_connectivity(grpc_router_server):
         service_token=token
     )
 
-    with pytest.raises(ValueError) as exc:
+    with pytest.raises(grpc.RpcError) as exc:
         client.get_service(service_id)
-    assert str(exc.value) == "No service available."
+    assert exc.value.code() == grpc.StatusCode.NOT_FOUND
+    assert exc.value.details() == "The service_id has no registered instances."
 
 
 def test_multiple_services_round_robin(grpc_router_server):
