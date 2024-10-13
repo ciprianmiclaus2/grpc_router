@@ -1,5 +1,5 @@
 [project]
-name = "grpcrouter"
+name = "grpc_router"
 version = "0.1.0"
 description = "A simple grpc router to establish a simple grpc mesh."
 authors = [{name = "Ciprian Miclaus", email = "ciprianm@gmail.com"}]
