@@ -42,9 +42,15 @@ message ServiceEndpoint {
 }
 
 
+message ServiceMetadata {
+    string region = 1;
+    int32 slots = 2;
+}
+
 message ServiceRegistrationRequest {
     string service_id = 1;  // identifier of the service that the clients will use
-    ServiceEndpoint service_endpoint = 2;
+    ServiceEndpoint endpoint = 2;
+    ServiceMetadata metadata = 3;
 }
 
 
@@ -62,11 +68,17 @@ message ServiceDeregistrationRequest {
 message ServiceDeregistrationResponse {
 }
 
+message ServiceHints {
+    string region = 1;
+}
+
 message GetRegisteredServiceRequest {
     string service_id = 1;
+    ServiceHints hints = 2;
 }
+
 
 message GetRegisteredServiceResponse {
     string service_id = 1;
-    ServiceEndpoint service_endpoint = 2;
+    ServiceEndpoint endpoint = 2;
 }

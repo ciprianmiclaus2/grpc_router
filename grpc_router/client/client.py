@@ -57,8 +57,8 @@ class GRPCRouterClient:
     def register_service(self, service_id: str, host: str, port: int) -> str:
         request = ServiceRegistrationRequest()
         request.service_id = service_id
-        request.service_endpoint.host = host
-        request.service_endpoint.port = port
+        request.endpoint.host = host
+        request.endpoint.port = port
         res = self.stub.RegisterService(request)
         return res.service_token
 
@@ -72,4 +72,4 @@ class GRPCRouterClient:
         res = self.stub.GetRegisteredService(
             GetRegisteredServiceRequest(service_id=service_id)
         )
-        return res.service_endpoint.host, res.service_endpoint.port
+        return res.endpoint.host, res.endpoint.port

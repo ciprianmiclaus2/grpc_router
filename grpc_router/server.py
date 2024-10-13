@@ -24,14 +24,14 @@ class GRPCRouterServer(GRPCRouterServiceServicer):
                 grpc.StatusCode.INVALID_ARGUMENT,
                 "The service_id cannot be empty."
             )
-        host = request.service_endpoint.host
+        host = request.endpoint.host
         if not host:
             context.abort(
                 grpc.StatusCode.INVALID_ARGUMENT,
                 "The host cannot be empty."
             )
 
-        port = request.service_endpoint.port
+        port = request.endpoint.port
         if port <= 0:
             context.abort(
                 grpc.StatusCode.INVALID_ARGUMENT,
@@ -43,8 +43,10 @@ class GRPCRouterServer(GRPCRouterServiceServicer):
         self._validate_RegisterService(request, context)
         service_token, error = self._register.register_service(
             service_id=request.service_id,
-            host=request.service_endpoint.host,
-            port=request.service_endpoint.port
+            host=request.endpoint.host,
+            port=request.endpoint.port,
+            region=request.metadata.region,
+            slots=request.metadata.slots,
         )
         return ServiceRegistrationResponse(
             service_token=service_token
@@ -88,7 +90,8 @@ class GRPCRouterServer(GRPCRouterServiceServicer):
     def GetRegisteredService(self, request, context):
         self._validate_GetRegisteredService(request, context)
         service = self._register.get_service(
-            service_id=request.service_id
+            service_id=request.service_id,
+            region=request.hints.region
         )
         if service is None:
             context.abort(
@@ -97,8 +100,8 @@ class GRPCRouterServer(GRPCRouterServiceServicer):
             )
         response = GetRegisteredServiceResponse()
         response.service_id = service.service_id
-        response.service_endpoint.host = service.host
-        response.service_endpoint.port = service.port
+        response.endpoint.host = service.host
+        response.endpoint.port = service.port
         return response
 
 
