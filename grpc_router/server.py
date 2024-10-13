@@ -9,13 +9,15 @@ from grpc_router.stubs.grpc_router_service_pb2 import (
     GetRegisteredServiceResponse,
 )
 
+from grpc_router.core.models import ConfigOptions
 from grpc_router.core.register import ServiceRegister
 
 
 class GRPCRouterServer(GRPCRouterServiceServicer):
 
-    def __init__(self):
-        self._register = ServiceRegister()
+    def __init__(self, config: ConfigOptions):
+        self._config = config
+        self._register = ServiceRegister(config)
 
     def _validate_RegisterService(self, request, context):
         service_id = request.service_id
@@ -37,9 +39,14 @@ class GRPCRouterServer(GRPCRouterServiceServicer):
                 grpc.StatusCode.INVALID_ARGUMENT,
                 "The port cannot be negative or zero."
             )
+        region = request.metadata.region
+        if not region and not self._config.allow_global_region:
+            context.abort(
+                grpc.StatusCode.INVALID_ARGUMENT,
+                "The region cannot be empty in this current configuration."
+            )
 
-    def RegisterService(self, request, context):
-        response = ()
+    def RegisterService(self, request, context) -> ServiceRegistrationResponse:
         self._validate_RegisterService(request, context)
         service_token, error = self._register.register_service(
             service_id=request.service_id,
@@ -52,7 +59,7 @@ class GRPCRouterServer(GRPCRouterServiceServicer):
             service_token=service_token
         )
 
-    def _validate_DeregisterService(self, request, context) -> bool:
+    def _validate_DeregisterService(self, request, context) -> None:
         service_id = request.service_id
         if not service_id:
             context.abort(
@@ -66,20 +73,15 @@ class GRPCRouterServer(GRPCRouterServiceServicer):
                 "The service_context cannot be empty."
             )
 
-    def DeregisterService(self, request, context):
+    def DeregisterService(self, request, context) -> ServiceDeregistrationResponse:
         self._validate_DeregisterService(request, context)
-        error = self._register.deregister_service(
+        self._register.deregister_service(
             service_id=request.service_id,
             service_token=request.service_token
         )
-        if error:
-            context.abort(
-                grpc.StatusCode.NOT_FOUND,
-                "The service_id/service_context combination is not registered."
-            )
         return ServiceDeregistrationResponse()
 
-    def _validate_GetRegisteredService(self, request, context) -> bool:
+    def _validate_GetRegisteredService(self, request, context) -> None:
         service_id = request.service_id
         if not service_id:
             context.abort(
@@ -87,7 +89,7 @@ class GRPCRouterServer(GRPCRouterServiceServicer):
                 "The service_id cannot be empty."
             )
 
-    def GetRegisteredService(self, request, context):
+    def GetRegisteredService(self, request, context) -> GetRegisteredServiceResponse:
         self._validate_GetRegisteredService(request, context)
         service = self._register.get_service(
             service_id=request.service_id,
@@ -98,6 +100,7 @@ class GRPCRouterServer(GRPCRouterServiceServicer):
                 grpc.StatusCode.NOT_FOUND,
                 "The service_id has no registered instances."
             )
+        assert service is not None
         response = GetRegisteredServiceResponse()
         response.service_id = service.service_id
         response.endpoint.host = service.host
@@ -105,10 +108,10 @@ class GRPCRouterServer(GRPCRouterServiceServicer):
         return response
 
 
-def serve(hostname: str="[::]", port: int=50034, max_workers: int=10):
-    server = grpc.server(ThreadPoolExecutor(max_workers=max_workers))
-    add_GRPCRouterServiceServicer_to_server(GRPCRouterServer(), server)
-    server.add_insecure_port(f"{hostname}:{port}")
+def serve(config: ConfigOptions) -> None:
+    server = grpc.server(ThreadPoolExecutor(max_workers=config.max_workers))
+    add_GRPCRouterServiceServicer_to_server(GRPCRouterServer(config), server)
+    server.add_insecure_port(f"{config.hostname}:{config.port}")
     server.start()
     server.wait_for_termination()
 
@@ -124,12 +127,13 @@ def main():
                         help='Maximum concurrent workers to handle requests.')
 
     args = parser.parse_args()
-    serve(
+    config = ConfigOptions(
         hostname=args.hostname,
         port=args.port,
         max_workers=args.max_workers,
     )
+    serve(config)
 
 
 if __name__ == "__main__":
-    serve()
+    main()
