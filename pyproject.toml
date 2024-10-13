@@ -33,7 +33,6 @@ dev = [
     "grpcio-tools",
     "tox",
     "pre-commit",
-    "virtualenv",
     "pip",
     "twine",
     "toml"
