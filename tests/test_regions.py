@@ -1,5 +1,6 @@
-from grpc_router.client.client import GRPCRouterClient
 import pytest
+
+from grpc_router.client.client import GRPCRouterClient
 
 
 def register_svc(client: GRPCRouterClient, service_id: str, region: str, instance: int, port: int) -> str:
