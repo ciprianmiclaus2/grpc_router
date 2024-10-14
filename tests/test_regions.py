@@ -1,3 +1,4 @@
+import grpc
 import pytest
 
 from grpc_router.client.client import GRPCRouterClient
@@ -97,6 +98,55 @@ def test_region_no_global_region(region, expected_host, expected_port, grpc_rout
         host, port = client.get_service(service_id, region=region)
         assert host == expected_host
         assert port == expected_port
+    finally:
+        for token in tokens:
+            client.deregister_service(
+                service_id=service_id,
+                service_token=token
+            )
+
+
+def test_region_cross_region(grpc_router_server):
+    service_id = "my.region.cross_region.test.service"
+
+    client = GRPCRouterClient("localhost", 7654)
+
+    tokens = []
+
+    tokens = [
+        register_svc(client, service_id, "USEast", 1, 9000),
+        register_svc(client, service_id, "USEast", 2, 9001),
+        register_svc(client, service_id, "USWest", 1, 9002),
+    ]
+    try:
+        host, port = client.get_service(service_id, region="USMidWest")
+        assert host == "USEast1.mydomain.com"
+        assert port == 9000
+    finally:
+        for token in tokens:
+            client.deregister_service(
+                service_id=service_id,
+                service_token=token
+            )
+
+
+def test_region_no_cross_region(grpc_router_server_no_global_region_no_cross_region):
+    service_id = "my.region.no_cross_region.test.service"
+
+    client = GRPCRouterClient("localhost", 7652)
+
+    tokens = []
+
+    tokens = [
+        register_svc(client, service_id, "USEast", 1, 9000),
+        register_svc(client, service_id, "USEast", 2, 9001),
+        register_svc(client, service_id, "USWest", 1, 9002),
+    ]
+    try:
+        with pytest.raises(grpc.RpcError) as exc:
+            client.get_service(service_id, region="USMidWest")
+        assert exc.value.code() == grpc.StatusCode.NOT_FOUND
+        assert exc.value.details() == "The service_id has no registered instances."
     finally:
         for token in tokens:
             client.deregister_service(

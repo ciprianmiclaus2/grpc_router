@@ -23,6 +23,22 @@ def test_register_service_validation_errors(service_id, host, port, region, expe
     assert exc.value.details() == expected_err_str
 
 
+@pytest.mark.parametrize("service_id,host,port,region,expected_err_code,expected_err_str", [
+    ["my,svc", "myhost", 1234, "", grpc.StatusCode.INVALID_ARGUMENT, "The region cannot be empty in this current configuration."],
+])
+def test_register_service_validation_errors_no_global_region(service_id, host, port, region, expected_err_code, expected_err_str, grpc_router_server_no_allow_global_region):
+    client = GRPCRouterClient("localhost", 7653)
+    with pytest.raises(grpc.RpcError) as exc:
+        client.register_service(
+            service_id=service_id,
+            host=host,
+            port=port,
+            region=region
+        )
+    assert exc.value.code() == expected_err_code
+    assert exc.value.details() == expected_err_str
+
+
 @pytest.mark.parametrize("service_id,service_token,expected_err_code,expected_err_str", [
     ["", "token", grpc.StatusCode.INVALID_ARGUMENT, "The service_id cannot be empty."],
     ["my,svc", "", grpc.StatusCode.INVALID_ARGUMENT, "The service_context cannot be empty."],
