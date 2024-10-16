@@ -9,7 +9,6 @@ def test_server_entrypoint(serve_mock):
     args = ["server.py", "--hostname", "localhost", "--port", "9567", "--max-workers", "10"]
     with mock.patch.object(sys, 'argv', args):
         main()
-    breakpoint()
     serve_mock.assert_called_once()
     config_options = serve_mock.call_args[0][0]
     assert config_options.hostname == "localhost"
