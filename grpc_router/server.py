@@ -118,9 +118,9 @@ def serve(config: ConfigOptions) -> None:
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('-h', '--hostname', dest='hostname', default='[::]',
+    parser.add_argument('-n', '--hostname', dest='hostname', default='[::]',
                         help='Hostname to bind the service to')
-    parser.add_argument('-p', '--port', dest='port', default=50034,
+    parser.add_argument('-p', '--port', dest='port', default=50034, type=int,
                         help='Port to bind this service to')
     parser.add_argument('-w', '--max-workers', dest='max_workers',
                         type=int, default=10,
