@@ -21,6 +21,7 @@ classifiers=[
 
 dependencies = [
     "grpcio",
+    "grpc-reflection",
     "protobuf",
 ]
 

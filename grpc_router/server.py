@@ -1,12 +1,14 @@
 import argparse
 from concurrent.futures import ThreadPoolExecutor
 import grpc
+from grpc_reflection.v1alpha import reflection
 
 from grpc_router.stubs.grpc_router_service_pb2_grpc import add_GRPCRouterServiceServicer_to_server, GRPCRouterServiceServicer
 from grpc_router.stubs.grpc_router_service_pb2 import (
     ServiceRegistrationResponse,
     ServiceDeregistrationResponse,
     GetRegisteredServiceResponse,
+    DESCRIPTOR,
 )
 
 from grpc_router.core.models import ConfigOptions
@@ -111,6 +113,11 @@ class GRPCRouterServer(GRPCRouterServiceServicer):
 def serve(config: ConfigOptions) -> None:
     server = grpc.server(ThreadPoolExecutor(max_workers=config.max_workers))
     add_GRPCRouterServiceServicer_to_server(GRPCRouterServer(config), server)
+    SERVICE_NAMES = (
+        DESCRIPTOR.services_by_name["GRPCRouterService"].full_name,
+        reflection.SERVICE_NAME,
+    )
+    reflection.enable_server_reflection(SERVICE_NAMES, server)
     server.add_insecure_port(f"{config.hostname}:{config.port}")
     server.start()
     server.wait_for_termination()

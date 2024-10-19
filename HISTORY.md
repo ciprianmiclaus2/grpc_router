@@ -2,6 +2,7 @@
 
 ## 0.2.0 (XXXX-XX-XX)
 
+* Enable reflection in the server
 * Fix the server cli -h conflicting with --help and the port not being parsed as an int
 
 ## 0.1.0 (2024-10-13)
