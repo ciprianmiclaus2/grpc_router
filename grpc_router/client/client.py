@@ -7,6 +7,7 @@ from grpc_router.stubs.grpc_router_service_pb2 import (
     GetRegisteredServiceRequest,
     ServiceDeregistrationRequest,
     ServiceRegistrationRequest,
+    DESCRIPTOR,
 )
 
 
@@ -14,7 +15,7 @@ class GRPCRouterClient:
 
     DEFAULT_GRPC_SERVICE_CONFIG = {
         "methodConfig": [{
-            "name": [{"service": ""}],
+            "name": [{"service": DESCRIPTOR.services_by_name["GRPCRouterService"].full_name,}],
             "retryPolicy": {
                 "maxAttempts": 5,
                 "initialBackoff": "5s",

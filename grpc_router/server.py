@@ -1,6 +1,9 @@
 import argparse
 from concurrent.futures import ThreadPoolExecutor
 import grpc
+from grpc_health.v1 import health
+from grpc_health.v1 import health_pb2
+from grpc_health.v1 import health_pb2_grpc
 from grpc_reflection.v1alpha import reflection
 
 from grpc_router.stubs.grpc_router_service_pb2_grpc import add_GRPCRouterServiceServicer_to_server, GRPCRouterServiceServicer
@@ -110,14 +113,31 @@ class GRPCRouterServer(GRPCRouterServiceServicer):
         return response
 
 
-def serve(config: ConfigOptions) -> None:
-    server = grpc.server(ThreadPoolExecutor(max_workers=config.max_workers))
-    add_GRPCRouterServiceServicer_to_server(GRPCRouterServer(config), server)
+def enable_reflection_service(server: grpc.Server) -> None:
     SERVICE_NAMES = (
         DESCRIPTOR.services_by_name["GRPCRouterService"].full_name,
         reflection.SERVICE_NAME,
     )
     reflection.enable_server_reflection(SERVICE_NAMES, server)
+
+
+def enable_health_service(server: grpc.Server) -> None:
+    health_servicer = health.HealthServicer(
+        experimental_non_blocking=True,
+        experimental_thread_pool=ThreadPoolExecutor(max_workers=5),
+    )
+    health_pb2_grpc.add_HealthServicer_to_server(health_servicer, server)
+    health_servicer.set(
+        DESCRIPTOR.services_by_name["GRPCRouterService"].full_name,
+        health_pb2.HealthCheckResponse.SERVING
+    )
+
+
+def serve(config: ConfigOptions) -> None:
+    server = grpc.server(ThreadPoolExecutor(max_workers=config.max_workers))
+    add_GRPCRouterServiceServicer_to_server(GRPCRouterServer(config), server)
+    enable_reflection_service(server)
+    enable_health_service(server)
     server.add_insecure_port(f"{config.hostname}:{config.port}")
     server.start()
     server.wait_for_termination()
