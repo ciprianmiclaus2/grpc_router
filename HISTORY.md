@@ -1,6 +1,6 @@
 # History
 
-## 0.2.0 (XXXX-XX-XX)
+## 0.2.0 (2024-10-23)
 
 * Enable health checking service on the grpc router
 * Enable reflection in the server
