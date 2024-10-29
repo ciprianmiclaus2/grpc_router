@@ -49,6 +49,11 @@ class GRPCRouterServiceStub(object):
                 request_serializer=grpc__router_dot_stubs_dot_grpc__router__service__pb2.GetRegisteredServiceRequest.SerializeToString,
                 response_deserializer=grpc__router_dot_stubs_dot_grpc__router__service__pb2.GetRegisteredServiceResponse.FromString,
                 _registered_method=True)
+        self.PushHealthStatus = channel.unary_unary(
+                '/grpcrouter.GRPCRouterService/PushHealthStatus',
+                request_serializer=grpc__router_dot_stubs_dot_grpc__router__service__pb2.HealthInfoRequest.SerializeToString,
+                response_deserializer=grpc__router_dot_stubs_dot_grpc__router__service__pb2.HealthInfoResponse.FromString,
+                _registered_method=True)
 
 
 class GRPCRouterServiceServicer(object):
@@ -90,6 +95,18 @@ class GRPCRouterServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def PushHealthStatus(self, request, context):
+        """Client pushes the health status periodically
+
+        This is used in the ACTIVE_CLIENT modus operandi for clients to
+        push health info to the grpc router.
+        Clients using this method must specify health check type ACTIVE_CLIENT
+        when registering.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_GRPCRouterServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -107,6 +124,11 @@ def add_GRPCRouterServiceServicer_to_server(servicer, server):
                     servicer.GetRegisteredService,
                     request_deserializer=grpc__router_dot_stubs_dot_grpc__router__service__pb2.GetRegisteredServiceRequest.FromString,
                     response_serializer=grpc__router_dot_stubs_dot_grpc__router__service__pb2.GetRegisteredServiceResponse.SerializeToString,
+            ),
+            'PushHealthStatus': grpc.unary_unary_rpc_method_handler(
+                    servicer.PushHealthStatus,
+                    request_deserializer=grpc__router_dot_stubs_dot_grpc__router__service__pb2.HealthInfoRequest.FromString,
+                    response_serializer=grpc__router_dot_stubs_dot_grpc__router__service__pb2.HealthInfoResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -190,6 +212,33 @@ class GRPCRouterService(object):
             '/grpcrouter.GRPCRouterService/GetRegisteredService',
             grpc__router_dot_stubs_dot_grpc__router__service__pb2.GetRegisteredServiceRequest.SerializeToString,
             grpc__router_dot_stubs_dot_grpc__router__service__pb2.GetRegisteredServiceResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def PushHealthStatus(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/grpcrouter.GRPCRouterService/PushHealthStatus',
+            grpc__router_dot_stubs_dot_grpc__router__service__pb2.HealthInfoRequest.SerializeToString,
+            grpc__router_dot_stubs_dot_grpc__router__service__pb2.HealthInfoResponse.FromString,
             options,
             channel_credentials,
             insecure,

@@ -4,7 +4,8 @@ import pytest
 from grpc_router.client.client import GRPCRouterClient
 
 
-def register_svc(client: GRPCRouterClient, service_id: str, region: str, instance: int, port: int) -> str:
+def register_svc(service_id: str, region: str, instance: int, port: int) -> GRPCRouterClient:
+    client = GRPCRouterClient("localhost", 7654)
     token = client.register_service(
         service_id=service_id,
         host=f"{region}{instance}.mydomain.com",
@@ -12,7 +13,7 @@ def register_svc(client: GRPCRouterClient, service_id: str, region: str, instanc
         region=region
     )
     assert token is not None
-    return token
+    return client
 
 
 @pytest.mark.parametrize('region,expected_host,expected_port', [
@@ -35,14 +36,14 @@ def test_region_stickiness(region, expected_host, expected_port, grpc_router_ser
 
     client = GRPCRouterClient("localhost", 7654)
 
-    tokens = [
-        register_svc(client, service_id, "USEast", 1, 9000),
-        register_svc(client, service_id, "USEast", 2, 9001),
-        register_svc(client, service_id, "USWest", 1, 9002),
-        register_svc(client, service_id, "USWest", 2, 9003),
-        register_svc(client, service_id, "USWest", 3, 9004),
-        register_svc(client, service_id, "", 1, 9005),
-        register_svc(client, service_id, "", 2, 9006),
+    clients = [
+        register_svc(service_id, "USEast", 1, 9000),
+        register_svc(service_id, "USEast", 2, 9001),
+        register_svc(service_id, "USWest", 1, 9002),
+        register_svc(service_id, "USWest", 2, 9003),
+        register_svc(service_id, "USWest", 3, 9004),
+        register_svc(service_id, "", 1, 9005),
+        register_svc(service_id, "", 2, 9006),
     ]
 
     try:
@@ -50,10 +51,9 @@ def test_region_stickiness(region, expected_host, expected_port, grpc_router_ser
         assert host == expected_host
         assert port == expected_port
     finally:
-        for token in tokens:
-            client.deregister_service(
-                service_id=service_id,
-                service_token=token
+        for c in clients:
+            c.deregister_service(
+                service_id=service_id
             )
 
 
@@ -82,16 +82,14 @@ def test_region_no_global_region(region, expected_host, expected_port, grpc_rout
 
     client = GRPCRouterClient("localhost", 7654)
 
-    tokens = []
-
-    tokens = [
-        register_svc(client, service_id, "USEast", 1, 9000),
-        register_svc(client, service_id, "USEast", 2, 9001),
-        register_svc(client, service_id, "USWest", 1, 9002),
-        register_svc(client, service_id, "USWest", 2, 9003),
-        register_svc(client, service_id, "USWest", 3, 9004),
-        register_svc(client, service_id, "USCentral", 1, 9005),
-        register_svc(client, service_id, "USCentral", 2, 9006),
+    clients = [
+        register_svc(service_id, "USEast", 1, 9000),
+        register_svc(service_id, "USEast", 2, 9001),
+        register_svc(service_id, "USWest", 1, 9002),
+        register_svc(service_id, "USWest", 2, 9003),
+        register_svc(service_id, "USWest", 3, 9004),
+        register_svc(service_id, "USCentral", 1, 9005),
+        register_svc(service_id, "USCentral", 2, 9006),
     ]
 
     try:
@@ -99,10 +97,9 @@ def test_region_no_global_region(region, expected_host, expected_port, grpc_rout
         assert host == expected_host
         assert port == expected_port
     finally:
-        for token in tokens:
-            client.deregister_service(
-                service_id=service_id,
-                service_token=token
+        for c in clients:
+            c.deregister_service(
+                service_id=service_id
             )
 
 
@@ -111,22 +108,19 @@ def test_region_cross_region(grpc_router_server):
 
     client = GRPCRouterClient("localhost", 7654)
 
-    tokens = []
-
-    tokens = [
-        register_svc(client, service_id, "USEast", 1, 9000),
-        register_svc(client, service_id, "USEast", 2, 9001),
-        register_svc(client, service_id, "USWest", 1, 9002),
+    clients = [
+        register_svc(service_id, "USEast", 1, 9000),
+        register_svc(service_id, "USEast", 2, 9001),
+        register_svc(service_id, "USWest", 1, 9002),
     ]
     try:
         host, port = client.get_service(service_id, region="USMidWest")
         assert host == "USEast1.mydomain.com"
         assert port == 9000
     finally:
-        for token in tokens:
-            client.deregister_service(
-                service_id=service_id,
-                service_token=token
+        for c in clients:
+            c.deregister_service(
+                service_id=service_id
             )
 
 
@@ -135,12 +129,10 @@ def test_region_no_cross_region(grpc_router_server_no_global_region_no_cross_reg
 
     client = GRPCRouterClient("localhost", 7652)
 
-    tokens = []
-
-    tokens = [
-        register_svc(client, service_id, "USEast", 1, 9000),
-        register_svc(client, service_id, "USEast", 2, 9001),
-        register_svc(client, service_id, "USWest", 1, 9002),
+    clients = [
+        register_svc(service_id, "USEast", 1, 9000),
+        register_svc(service_id, "USEast", 2, 9001),
+        register_svc(service_id, "USWest", 1, 9002),
     ]
     try:
         with pytest.raises(grpc.RpcError) as exc:
@@ -148,8 +140,7 @@ def test_region_no_cross_region(grpc_router_server_no_global_region_no_cross_reg
         assert exc.value.code() == grpc.StatusCode.NOT_FOUND
         assert exc.value.details() == "The service_id has no registered instances."
     finally:
-        for token in tokens:
-            client.deregister_service(
-                service_id=service_id,
-                service_token=token
+        for c in clients:
+            c.deregister_service(
+                service_id=service_id
             )

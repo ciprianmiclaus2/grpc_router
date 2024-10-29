@@ -1,5 +1,10 @@
 # History
 
+## 0.3.0 (XXXX-XX-XX)
+
+* Support for active client health check type (passive not yet implemented)
+* Fix the service registration implementation to be thread safe
+
 ## 0.2.0 (2024-10-23)
 
 * Enable health checking service on the grpc router

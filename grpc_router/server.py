@@ -8,14 +8,38 @@ from grpc_reflection.v1alpha import reflection
 
 from grpc_router.stubs.grpc_router_service_pb2_grpc import add_GRPCRouterServiceServicer_to_server, GRPCRouterServiceServicer
 from grpc_router.stubs.grpc_router_service_pb2 import (
+    HEALTH_CHECK_ACTIVE_CLIENT,
+    HEALTH_CHECK_PASSIVE_CLIENT,
+    HEALTH_STATUS_GOOD,
+    HEALTH_STATUS_WARNING,
+    HEALTH_STATUS_ERROR,
+    HealthInfoResponse,
     ServiceRegistrationResponse,
     ServiceDeregistrationResponse,
     GetRegisteredServiceResponse,
     DESCRIPTOR,
 )
 
-from grpc_router.core.models import ConfigOptions
+from grpc_router.core.models import ConfigOptions, HealthCheckType, HealthStatus
 from grpc_router.core.register import ServiceRegister
+
+
+def to_health_check_type(health_check_type: int) -> HealthCheckType:
+    if health_check_type == HEALTH_CHECK_ACTIVE_CLIENT:
+        return HealthCheckType.ACTIVE_CLIENT
+    elif health_check_type == HEALTH_CHECK_PASSIVE_CLIENT:
+        return HealthCheckType.PASSIVE_CLIENT
+    return HealthCheckType.NONE
+
+
+def to_health_status(health_status: int) -> HealthStatus:
+    if health_status == HEALTH_STATUS_GOOD:
+        return HealthStatus.GOOD
+    elif health_status == HEALTH_STATUS_ERROR:
+        return HealthStatus.ERROR
+    elif health_status == HEALTH_STATUS_WARNING:
+        return HealthStatus.WARNING
+    return HealthStatus.UNKNOWN
 
 
 class GRPCRouterServer(GRPCRouterServiceServicer):
@@ -59,6 +83,7 @@ class GRPCRouterServer(GRPCRouterServiceServicer):
             port=request.endpoint.port,
             region=request.metadata.region,
             slots=request.metadata.slots,
+            health_check_type=to_health_check_type(request.metadata.health_check_type),
         )
         return ServiceRegistrationResponse(
             service_token=service_token
@@ -75,7 +100,7 @@ class GRPCRouterServer(GRPCRouterServiceServicer):
         if not service_token:
             context.abort(
                 grpc.StatusCode.INVALID_ARGUMENT,
-                "The service_context cannot be empty."
+                "The service_token cannot be empty."
             )
 
     def DeregisterService(self, request, context) -> ServiceDeregistrationResponse:
@@ -110,6 +135,35 @@ class GRPCRouterServer(GRPCRouterServiceServicer):
         response.service_id = service.service_id
         response.endpoint.host = service.host
         response.endpoint.port = service.port
+        return response
+
+    def _validate_PushHealthStatus(self, request, context) -> None:
+        service_id = request.service_id
+        if not service_id:
+            context.abort(
+                grpc.StatusCode.INVALID_ARGUMENT,
+                "The service_id cannot be empty."
+            )
+        service_token = request.service_token
+        if not service_token:
+            context.abort(
+                grpc.StatusCode.INVALID_ARGUMENT,
+                "The service_context cannot be empty."
+            )
+
+    def PushHealthStatus(self, request, context) -> HealthInfoResponse:
+        self._validate_PushHealthStatus(request, context)
+        svc = self._register.push_health_status(
+            service_id=request.service_id,
+            service_token=request.service_token,
+            health_status=to_health_status(request.status),
+            description=request.description)
+        if svc is None:
+            context.abort(
+                grpc.StatusCode.NOT_FOUND,
+                "The service could not be found."
+            )
+        response = HealthInfoResponse()
         return response
 
 

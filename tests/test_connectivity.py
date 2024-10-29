@@ -25,8 +25,7 @@ def test_connectivity(grpc_router_server):
     assert port == 9998
 
     client.deregister_service(
-        service_id=service_id,
-        service_token=token
+        service_id=service_id
     )
 
     with pytest.raises(grpc.RpcError) as exc:
@@ -38,24 +37,27 @@ def test_connectivity(grpc_router_server):
 def test_multiple_services_round_robin(grpc_router_server):
     service_id = "my.own.test.service"
 
-    client = GRPCRouterClient("localhost", 7654)
+    client1 = GRPCRouterClient("localhost", 7654)
+    client2 = GRPCRouterClient("localhost", 7654)
+    client3 = GRPCRouterClient("localhost", 7654)
 
-    token1 = client.register_service(
+    token1 = client1.register_service(
         service_id=service_id,
         host="myhost1.mydomain.com",
         port=9990
     )
-    token2 = client.register_service(
+    token2 = client2.register_service(
         service_id=service_id,
         host="myhost2.mydomain.com",
         port=9991
     )
-    token3 = client.register_service(
+    token3 = client3.register_service(
         service_id=service_id,
         host="myhost3.mydomain.com",
         port=9992
     )
 
+    client = GRPCRouterClient("localhost", 7654)
     host, port = client.get_service(service_id)
     assert host == "myhost1.mydomain.com"
     assert port == 9990
@@ -69,15 +71,12 @@ def test_multiple_services_round_robin(grpc_router_server):
     assert host == "myhost1.mydomain.com"
     assert port == 9990
 
-    client.deregister_service(
-        service_id=service_id,
-        service_token=token1
+    client1.deregister_service(
+        service_id=service_id
     )
-    client.deregister_service(
-        service_id=service_id,
-        service_token=token2
+    client2.deregister_service(
+        service_id=service_id
     )
-    client.deregister_service(
-        service_id=service_id,
-        service_token=token3
+    client3.deregister_service(
+        service_id=service_id
     )

@@ -33,6 +33,30 @@ service GRPCRouterService {
     // round-robin fashion.
     rpc GetRegisteredService(GetRegisteredServiceRequest) returns (GetRegisteredServiceResponse) {}
 
+
+    // Client pushes the health status periodically
+    //
+    // This is used in the ACTIVE_CLIENT modus operandi for clients to
+    // push health info to the grpc router.
+    // Clients using this method must specify health check type ACTIVE_CLIENT
+    // when registering.
+    rpc PushHealthStatus(HealthInfoRequest) returns (HealthInfoResponse) {}
+
+}
+
+
+enum HealthCheckType {
+    HEALTH_CHECK_NONE = 0;  // no health checks
+    HEALTH_CHECK_ACTIVE_CLIENT = 1;  // client will push health notifications to the server
+    HEALTH_CHECK_PASSIVE_CLIENT = 2;  // client implements the health grpc interface and server should poll/watch
+}
+
+
+enum HealthStatus {
+    HEALTH_STATUS_UNKNOWN = 0;
+    HEALTH_STATUS_GOOD = 1;
+    HEALTH_STATUS_WARNING = 2;
+    HEALTH_STATUS_ERROR = 3;
 }
 
 
@@ -45,6 +69,7 @@ message ServiceEndpoint {
 message ServiceMetadata {
     string region = 1;
     int32 slots = 2;
+    HealthCheckType health_check_type = 3;
 }
 
 message ServiceRegistrationRequest {
@@ -81,4 +106,15 @@ message GetRegisteredServiceRequest {
 message GetRegisteredServiceResponse {
     string service_id = 1;
     ServiceEndpoint endpoint = 2;
+}
+
+
+message HealthInfoRequest {
+    string service_id = 1;
+    string service_token = 2;
+    HealthStatus status = 3;
+    string description = 4;
+}
+
+message HealthInfoResponse{
 }
