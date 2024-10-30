@@ -26,12 +26,7 @@ class ConfigOptions:
     allow_global_region: bool=True
     allow_cross_region_connectivity: bool=True
 
-
-@dataclass
-class ServiceHealthStatus:
-    status: HealthStatus
-    description: str
-    timestamp: datetime.datetime
+    health_check_timeout: int=300  # in seconds
 
 
 @dataclass
@@ -43,13 +38,3 @@ class Service:
     slots: int
     health_check_type: HealthCheckType
     service_token: str
-
-    health_status: Optional[ServiceHealthStatus] = None
-
-
-    def set_health_status(self, status: HealthStatus, description: str, timestamp: datetime.datetime) -> None:
-        self.health_status = ServiceHealthStatus(
-            status=status,
-            description=description,
-            timestamp=timestamp
-        )
