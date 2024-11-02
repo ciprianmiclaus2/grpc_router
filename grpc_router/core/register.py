@@ -97,12 +97,11 @@ class ServiceRegister:
     def resolve_service(self, service_id: str, service_token: str) -> Optional[Service]:
         with self._lock:
             regional_entry = self._register.get(service_id)
-            if not regional_entry:
-                return
-            for _, entry in regional_entry.items():
-                idx = self._find_svc_idx(entry, service_token)
-                if idx is not None:
-                    return entry[idx]
+            if regional_entry:
+                for _, entry in regional_entry.items():
+                    idx = self._find_svc_idx(entry, service_token)
+                    if idx is not None:
+                        return entry[idx]
 
     def _find_svc_idx(self, entry_lst: list[Service], service_token: str) -> Optional[int]:
         for idx, svc in enumerate(entry_lst):
@@ -112,21 +111,20 @@ class ServiceRegister:
     def deregister_service(self, service_id: str, service_token: str) -> Optional[Service]:
         with self._lock:
             regional_entry = self._register.get(service_id)
-            if not regional_entry:
-                return
-            svc: Optional[Service] = None
-            for _, entry in regional_entry.items():
+            if regional_entry:
+                svc: Optional[Service] = None
+                for _, entry in regional_entry.items():
+                    idx = self._find_svc_idx(entry, service_token)
+                    if idx is not None:
+                        svc = entry.pop(idx)
+                        break
+                entry = self._non_global_services[service_id]
                 idx = self._find_svc_idx(entry, service_token)
                 if idx is not None:
                     svc = entry.pop(idx)
-                    break
-            entry = self._non_global_services[service_id]
-            idx = self._find_svc_idx(entry, service_token)
-            if idx is not None:
-                svc = entry.pop(idx)
-            if svc and svc.health_check_type != HealthCheckType.NONE:
-                del self._health_register[svc.service_token]
-            return svc
+                if svc and svc.health_check_type != HealthCheckType.NONE:
+                    del self._health_register[svc.service_token]
+                return svc
 
     def mark_service_unhealthy(self, service_id: str, service_token: str) -> None:
         with self._lock:
