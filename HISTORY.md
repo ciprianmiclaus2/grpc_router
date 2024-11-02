@@ -1,8 +1,11 @@
 # History
 
-## 0.3.0 (XXXX-XX-XX)
+## 0.3.0 (2024-11-02)
 
 * Support for active client health check type (passive not yet implemented)
+    - This is when the client pushes heathbeats into the server
+    - If the server detects a missed client heartbeat, it automatically marks the client as unhealthy and does not return it
+    - If the same client recovers, the server marks it back healthy
 * Fix the service registration implementation to be thread safe
 
 ## 0.2.0 (2024-10-23)
