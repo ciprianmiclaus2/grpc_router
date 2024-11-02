@@ -63,3 +63,19 @@ def grpc_router_server_no_global_region_no_cross_region():
     thread.daemon = True
     thread.start()
     yield
+
+
+@pytest.fixture(scope="session")
+def grpc_router_server_push_health_2s():
+    config = ConfigOptions(
+        hostname="localhost",
+        port=7654,
+        max_workers=1,
+        allow_global_region=True,
+        allow_cross_region_connectivity=True,
+        health_check_timeout=2
+    )
+    thread = Thread(target=serve, args=(config, ))
+    thread.daemon = True
+    thread.start()
+    yield

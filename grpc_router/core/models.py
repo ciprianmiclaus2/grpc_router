@@ -1,16 +1,16 @@
 from dataclasses import dataclass
 import datetime
-from enum import Enum
+from enum import IntEnum
 from typing import Optional
 
 
-class HealthCheckType(Enum):
+class HealthCheckType(IntEnum):
     NONE = 0
     ACTIVE_CLIENT = 1
     PASSIVE_CLIENT = 2
 
 
-class HealthStatus(Enum):
+class HealthStatus(IntEnum):
     UNKNOWN = 0
     GOOD = 1
     WARNING = 2

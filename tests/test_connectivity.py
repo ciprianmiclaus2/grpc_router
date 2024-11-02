@@ -41,17 +41,17 @@ def test_multiple_services_round_robin(grpc_router_server):
     client2 = GRPCRouterClient("localhost", 7654)
     client3 = GRPCRouterClient("localhost", 7654)
 
-    token1 = client1.register_service(
+    client1.register_service(
         service_id=service_id,
         host="myhost1.mydomain.com",
         port=9990
     )
-    token2 = client2.register_service(
+    client2.register_service(
         service_id=service_id,
         host="myhost2.mydomain.com",
         port=9991
     )
-    token3 = client3.register_service(
+    client3.register_service(
         service_id=service_id,
         host="myhost3.mydomain.com",
         port=9992

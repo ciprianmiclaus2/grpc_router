@@ -42,7 +42,7 @@ class GRPCRouterClient:
         }]
     }
 
-    HEALTh_PUSh_FREQUENCY_SECONDS = 60 * 5
+    HEALTh_PUSh_FREQUENCY_SECONDS = 60 * 3
 
     def __init__(self, host: str, port: int, grpc_service_config: Optional[dict[str, Any]]=None):
         self.host = host
@@ -82,10 +82,10 @@ class GRPCRouterClient:
                     try:
                         self.stub.PushHealthStatus(
                             HealthInfoRequest(
-                                service_id,
-                                svc["token"],
-                                svc["health_status"],
-                                svc["description"]
+                                service_id=service_id,
+                                service_token=svc["token"],
+                                status=svc["health_status"],
+                                description=svc["description"]
                             )
                         )
                     except Exception as exc:
