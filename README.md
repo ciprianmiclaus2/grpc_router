@@ -74,5 +74,20 @@ With `HealthCheckType.ACTIVE_CLIENT` the client sends heartbeats to the router. 
 heartbeats, or reports an error with `set_health_status(service_id, HEALTH_STATUS_ERROR, "why")`, is taken
 out of service until it reports a healthy status again (`HEALTH_STATUS_GOOD` or `HEALTH_STATUS_WARNING`,
 from `grpc_router.stubs.grpc_router_service_pb2`).
+
+If the router forgets a service (it restarted, or the service was out of service and silent for longer than
+the expiry timeout), the client registers the service again on its next heartbeat.
+
+### Keeping the register across router restarts
+
+```
+grpc-router --state-file /var/lib/grpc-router/state.json
+```
+
+The router saves its register to that JSON file in the background (at most once per `--state-save-interval`
+seconds, default 1, plus on shutdown) and reloads it on start, so clients can find services straight away
+after a restart, including services without health checks, which never re-register on their own. Restored
+services have a full health check timeout to send a heartbeat. The file holds the service tokens, so it is
+created readable by its owner only. Use one file per router.
 The router also exposes the standard gRPC health checking service, and server reflection (both v1 and v1alpha)
 so tools like `grpcurl` can list and describe its API.

@@ -30,6 +30,10 @@ class ConfigOptions:
 
     shutdown_grace: float = 5.0  # in seconds, for in-flight requests on SIGTERM/SIGINT
 
+    # write-behind persistence of the register: path of the JSON state file (None: disabled)
+    state_file: str | None = None
+    state_save_interval: float = 1.0  # in seconds, at most one save per interval
+
 
 @dataclass
 class Service:

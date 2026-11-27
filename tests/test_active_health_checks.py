@@ -1,3 +1,5 @@
+import copy
+import threading
 import time
 import unittest.mock as mock
 
@@ -167,3 +169,116 @@ def test_client_reports_error_then_recovers(grpc_router_server_push_health_2s, c
     time.sleep(1)
     assert client.get_service(service_id) == ("error.mydomain.com", 4324)
     service.close()
+
+
+ROUTER_RESTART_PORT = 7657
+
+
+def _start_router() -> grpc.Server:
+    from grpc_router.core.models import ConfigOptions
+    from grpc_router.server import create_server
+    server = create_server(ConfigOptions(hostname="localhost", port=ROUTER_RESTART_PORT, max_workers=2))
+    server.start()
+    return server
+
+
+def _wait_for(predicate, timeout: float = 5) -> bool:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if predicate():
+            return True
+        time.sleep(0.1)
+    return False
+
+
+def _available(client: GRPCRouterClient, service_id: str) -> bool:
+    try:
+        client.get_service(service_id)
+        return True
+    except grpc.RpcError as exc:
+        assert exc.code() == grpc.StatusCode.NOT_FOUND
+        return False
+
+
+@mock.patch.object(GRPCRouterClient, 'HEALTH_PUSH_FREQUENCY_SECONDS', new=0.3)
+@pytest.mark.parametrize("status_before_restart", [HealthStatus.GOOD, HealthStatus.ERROR])
+def test_client_registers_again_when_router_forgets_it(status_before_restart):
+    # a router restart without a state file: the heartbeats get NOT_FOUND
+    service_id = "router.restart.service"
+    router = _start_router()
+    # the default retry policy backs off up to 5s, then 10s, when the router is down: shorten it
+    fast_retries = copy.deepcopy(GRPCRouterClient.DEFAULT_GRPC_SERVICE_CONFIG)
+    fast_retries["methodConfig"][0]["retryPolicy"].update(initialBackoff="0.1s", maxBackoff="0.2s")
+    service = GRPCRouterClient("localhost", ROUTER_RESTART_PORT, grpc_service_config=fast_retries)
+    try:
+        token = service.register_service(service_id, "restart.mydomain.com", 4325, '', 10, HealthCheckType.ACTIVE_CLIENT)
+        service.set_health_status(service_id, status_before_restart, "")
+        router.stop(None).wait()
+        router = _start_router()
+
+        client = GRPCRouterClient("localhost", ROUTER_RESTART_PORT)
+        if status_before_restart == HealthStatus.GOOD:
+            assert _wait_for(lambda: _available(client, service_id))
+            assert client.get_service(service_id) == ("restart.mydomain.com", 4325)
+        else:
+            # registered again, but its current ERROR status keeps it out of service
+            assert _wait_for(lambda: service._service_register[service_id]["token"] != token)
+            time.sleep(1)
+            assert not _available(client, service_id)
+            service.set_health_status(service_id, HealthStatus.GOOD, "")
+            assert _wait_for(lambda: _available(client, service_id))
+        assert service._service_register[service_id]["token"] != token
+    finally:
+        service.close()
+        router.stop(None).wait()
+
+
+class _NotFound(grpc.RpcError, grpc.Call):
+    def code(self):
+        return grpc.StatusCode.NOT_FOUND
+
+    def details(self):
+        return "The service could not be found."
+
+    def initial_metadata(self):
+        return None
+
+    def trailing_metadata(self):
+        return None
+
+    def is_active(self):
+        return False
+
+    def time_remaining(self):
+        return None
+
+    def cancel(self):
+        return False
+
+    def add_callback(self, callback):
+        return False
+
+
+@mock.patch.object(GRPCRouterClient, 'HEALTH_PUSH_FREQUENCY_SECONDS', new=0.05)
+def test_deregister_during_reregistration_does_not_revive_the_service():
+    client = GRPCRouterClient("localhost", 1)
+    client._stub = stub = mock.Mock()
+    stub.RegisterService.return_value.service_token = "token1"
+    client.register_service("svc", "host", 1234, health_check_type=HealthCheckType.ACTIVE_CLIENT)
+
+    reregistered = threading.Event()
+
+    def register_while_deregistering(request):
+        client.deregister_service("svc")  # the application deregisters while the thread re-registers
+        reregistered.set()
+        return mock.Mock(service_token="token2")
+
+    stub.PushHealthStatus.side_effect = _NotFound()
+    stub.RegisterService.side_effect = register_while_deregistering
+    assert reregistered.wait(5)
+    client.close()
+
+    # token1 deregistered by the application, token2 undone by the push thread
+    tokens = [c.args[0].service_token for c in stub.DeregisterService.call_args_list]
+    assert tokens == ["token1", "token2"]
+    assert client._service_register == {}

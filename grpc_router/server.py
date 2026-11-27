@@ -3,6 +3,7 @@ import logging
 import signal
 import threading
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 from types import FrameType
 
 import grpc
@@ -10,6 +11,7 @@ from grpc_health.v1 import health, health_pb2, health_pb2_grpc
 from grpc_reflection.v1alpha import reflection, reflection_pb2, reflection_pb2_grpc
 
 from grpc_router.core.models import ConfigOptions, HealthCheckType, HealthStatus
+from grpc_router.core.persistence import StateWriter
 from grpc_router.core.register import ServiceRegister
 from grpc_router.stubs.grpc_router_service_pb2 import (
     DESCRIPTOR,
@@ -58,6 +60,16 @@ class GRPCRouterServer(GRPCRouterServiceServicer):
     def __init__(self, config: ConfigOptions) -> None:
         self._config = config
         self._register = ServiceRegister(config)
+        self._state_writer: StateWriter | None = None
+        if config.state_file:
+            self._state_writer = StateWriter(Path(config.state_file), self._register, config.state_save_interval)
+            self._state_writer.start()
+
+    def close(self) -> None:
+        """Save any pending change of the register to the state file."""
+        if self._state_writer is not None:
+            self._state_writer.stop()
+            self._state_writer = None
 
     def _validate_RegisterService(self, request, context) -> None:
         service_id = request.service_id
@@ -207,23 +219,28 @@ def enable_health_service(server: grpc.Server) -> health.HealthServicer:
     return health_servicer
 
 
-def _build_server(config: ConfigOptions) -> tuple[grpc.Server, health.HealthServicer]:
+def _build_server(config: ConfigOptions) -> tuple[grpc.Server, health.HealthServicer, GRPCRouterServer]:
     server = grpc.server(
         ThreadPoolExecutor(max_workers=config.max_workers),
         # The router holds the service register in memory, so two routers sharing a
         # port (grpc enables SO_REUSEPORT by default on Linux) would split it.
         options=[("grpc.so_reuseport", 0)],
     )
-    add_GRPCRouterServiceServicer_to_server(GRPCRouterServer(config), server)
+    router = GRPCRouterServer(config)
+    add_GRPCRouterServiceServicer_to_server(router, server)
     enable_reflection_service(server)
     health_servicer = enable_health_service(server)
     server.add_insecure_port(f"{config.hostname}:{config.port}")
-    return server, health_servicer
+    return server, health_servicer, router
 
 
 def create_server(config: ConfigOptions) -> grpc.Server:
-    """Create a (not yet started) grpc router server bound to config.hostname:config.port."""
-    server, _ = _build_server(config)
+    """Create a (not yet started) grpc router server bound to config.hostname:config.port.
+
+    With config.state_file the register is loaded from it now and saved in the background;
+    use serve() to also get the final save on shutdown.
+    """
+    server, _, _ = _build_server(config)
     return server
 
 
@@ -234,7 +251,7 @@ def serve(config: ConfigOptions) -> None:
     the health status turns NOT_SERVING, new RPCs are rejected and in-flight RPCs get
     config.shutdown_grace seconds to complete. A second signal stops immediately.
     """
-    server, health_servicer = _build_server(config)
+    server, health_servicer, router = _build_server(config)
     server.start()
     logger.info("grpc router listening on %s:%s", config.hostname, config.port)
 
@@ -261,6 +278,7 @@ def serve(config: ConfigOptions) -> None:
     finally:
         for sig, handler in previous_handlers.items():
             signal.signal(sig, handler)
+        router.close()
     logger.info("grpc router stopped")
 
 
@@ -276,6 +294,11 @@ def main() -> None:
     parser.add_argument('-g', '--shutdown-grace', dest='shutdown_grace',
                         type=float, default=5.0,
                         help='Seconds to let in-flight requests complete on SIGTERM/SIGINT.')
+    parser.add_argument('-s', '--state-file', dest='state_file', default=None,
+                        help='JSON file to save the service register to (write behind) and to reload it from '
+                             'on restart. Disabled by default. One file per router.')
+    parser.add_argument('--state-save-interval', dest='state_save_interval', type=float, default=1.0,
+                        help='Save the state file at most once per this many seconds.')
 
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -284,6 +307,8 @@ def main() -> None:
         port=args.port,
         max_workers=args.max_workers,
         shutdown_grace=args.shutdown_grace,
+        state_file=args.state_file,
+        state_save_interval=args.state_save_interval,
     )
     serve(config)
 

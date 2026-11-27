@@ -16,6 +16,9 @@ service GRPCRouterService {
     // the service but it can be anything, e.g.: org.suborg.scope1.service1
     // It also has information about how clients can connect directly to the service (ie host/port)
     // The service gets back a service_token which it can use to communicate with the grpc router.
+    // A registration replaces the entries of the same service_id, host and port that look dead
+    // (e.g. the same service restarted): entries that are out of service, that missed heartbeats or
+    // that have no health checks.
     rpc RegisterService(ServiceRegistrationRequest) returns (ServiceRegistrationResponse) {}
 
     // Deregister a service endpoint

@@ -20,6 +20,14 @@
 * `GRPCRouterClient` caches its stub, and gains `close()` and context manager support.
 * `GRPCRouterClient.HEALTh_PUSh_FREQUENCY_SECONDS` renamed to `HEALTH_PUSH_FREQUENCY_SECONDS`
   (the old name is kept as a deprecated alias).
+* Optional write-behind persistence of the register (`--state-file`, `--state-save-interval`;
+  `ConfigOptions.state_file`, `state_save_interval`): a human readable JSON file with the time of the last save,
+  written atomically, reloaded on start. Restored instances get a fresh health check timeout. A file that cannot be
+  loaded is moved aside to `<name>.bad-<timestamp>` and the router starts empty.
+* The client registers a service again when its heartbeat gets NOT_FOUND (the router restarted without a state
+  file, or forgot an out of service instance that went silent), and re-sends its current status at once.
+* A registration replaces the dead looking entries for the same service_id, host and port (out of service, missed
+  heartbeats, or no health checks), so a restarted service no longer leaves stale or duplicate entries.
 * Reporting `HEALTH_STATUS_ERROR` now takes an `ACTIVE_CLIENT` service out of service (previously the status was
   stored but the service was still handed out). As after missed heartbeats, it keeps its token and goes back in service
   when it pushes any other status. Its `ERROR` heartbeats are now accepted while it is out of service (they used to

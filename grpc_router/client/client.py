@@ -1,6 +1,6 @@
 import json
 import logging
-from threading import Event, Thread
+from threading import Event, Lock, Thread
 from types import TracebackType
 from typing import Any, Self
 
@@ -53,6 +53,7 @@ class GRPCRouterClient:
         )
 
         self._service_register: dict[str, dict[str, Any]] = {}
+        self._register_lock = Lock()  # guards _service_register against the health push thread
 
         self._health_event = Event()
         self._health_push_stop = Event()
@@ -107,21 +108,52 @@ class GRPCRouterClient:
             if self._health_push_stop.is_set():
                 return
             self._health_event.clear()
-            for service_id, svc in list(self._service_register.items()):
+            with self._register_lock:
+                services = list(self._service_register.items())
+            for service_id, svc in services:
                 if self._health_push_stop.is_set():
                     return
                 if svc["health_check_type"] == HEALTH_CHECK_ACTIVE_CLIENT:
                     try:
-                        self.stub.PushHealthStatus(
-                            HealthInfoRequest(
-                                service_id=service_id,
-                                service_token=svc["token"],
-                                status=svc["health_status"],
-                                description=svc["description"]
-                            )
-                        )
+                        self._push_health_status(service_id, svc)
+                    except grpc.RpcError as exc:
+                        # the grpc.RpcError base class has no code(), the errors grpc raises do
+                        code = exc.code() if isinstance(exc, grpc.Call) else None
+                        if code != grpc.StatusCode.NOT_FOUND:
+                            logger.exception("Failed to publish health status for %s", service_id)
+                            continue
+                        # the router forgot this instance (router restarted without its state,
+                        # or the instance was out of service and silent for too long)
+                        logger.warning("The grpc router no longer knows %s; registering it again", service_id)
+                        try:
+                            self._reregister(service_id, svc)
+                        except Exception:
+                            logger.exception("Failed to register %s again", service_id)
                     except Exception:
                         logger.exception("Failed to publish health status for %s", service_id)
+
+    def _push_health_status(self, service_id: str, svc: dict[str, Any]) -> None:
+        self.stub.PushHealthStatus(
+            HealthInfoRequest(
+                service_id=service_id,
+                service_token=svc["token"],
+                status=svc["health_status"],
+                description=svc["description"]
+            )
+        )
+
+    def _reregister(self, service_id: str, svc: dict[str, Any]) -> None:
+        token = self.stub.RegisterService(svc["request"]).service_token
+        with self._register_lock:
+            current = self._service_register.get(service_id) is svc
+            if current:
+                svc["token"] = token
+        if not current:
+            # deregistered meanwhile: undo the registration we just made
+            self.stub.DeregisterService(ServiceDeregistrationRequest(service_id=service_id, service_token=token))
+            return
+        # straight away, so that e.g. an instance in ERROR goes out of service again
+        self._push_health_status(service_id, svc)
 
     def _start_health_push_thread(self) -> None:
         if self._health_push_thread is None:
@@ -137,7 +169,8 @@ class GRPCRouterClient:
     def register_service(
         self, service_id: str, host: str, port: int, region: str = "", slots: int = 10, health_check_type: int = 0
     ) -> str:
-        svc = self._service_register.get(service_id)
+        with self._register_lock:
+            svc = self._service_register.get(service_id)
         if svc is not None:
             return svc["token"]
         request = ServiceRegistrationRequest()
@@ -151,16 +184,19 @@ class GRPCRouterClient:
             self._start_health_push_thread()
         res = self.stub.RegisterService(request)
         token = res.service_token
-        self._service_register[service_id] = {
-            "token": token,
-            "health_check_type": health_check_type,
-            "health_status": HEALTH_STATUS_GOOD,
-            "description": "",
-        }
+        with self._register_lock:
+            self._service_register[service_id] = {
+                "token": token,
+                "request": request,  # to register again if the router forgets the instance
+                "health_check_type": health_check_type,
+                "health_status": HEALTH_STATUS_GOOD,
+                "description": "",
+            }
         return token
 
     def deregister_service(self, service_id: str) -> None:
-        svc = self._service_register.pop(service_id, None)
+        with self._register_lock:
+            svc = self._service_register.pop(service_id, None)
         if svc is None:
             return
         request = ServiceDeregistrationRequest()

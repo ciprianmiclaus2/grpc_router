@@ -2,8 +2,10 @@ import datetime
 import time
 import uuid
 from collections import defaultdict
+from collections.abc import Callable
 from dataclasses import dataclass
 from threading import RLock, Thread
+from typing import Any
 
 from grpc_router.core.models import ConfigOptions, HealthCheckType, HealthStatus, Service
 
@@ -29,6 +31,13 @@ class ServiceRegister:
     keep their token and go back in service as soon as they push a status other than
     ERROR. They are forgotten once they have not pushed anything (ERROR included) for
     config.unhealthy_expiry_timeout seconds; they then need to register again.
+
+    A registration replaces the entries of the same service_id, host and port that look
+    dead (a restarted service): out of service entries, entries that missed heartbeats
+    and entries without health checks (the router cannot tell whether those are alive).
+
+    on_change, when set, is called (under the register lock) after every change worth
+    persisting: anything but a heartbeat that only refreshes the last health update.
     """
 
     GLOBAL_REGION = ''
@@ -47,6 +56,21 @@ class ServiceRegister:
 
         self._health_check_thread: Thread | None = None
         self._lock = RLock()
+        self.on_change: Callable[[], None] | None = None
+
+    def _changed(self) -> None:
+        if self.on_change is not None:
+            self.on_change()
+
+    def _ensure_health_check_thread(self) -> None:
+        with self._lock:
+            if self._health_check_thread is None:
+                self._health_check_thread = Thread(
+                    target=self._health_check_thread_entrypoint,
+                    name="grpc-router-health-check",
+                    daemon=True,
+                )
+                self._health_check_thread.start()
 
     def _health_check_thread_entrypoint(self) -> None:
         while True:
@@ -71,6 +95,8 @@ class ServiceRegister:
             ]
             for token in expired:
                 del self._unhealthy_services[token]
+            if expired:
+                self._changed()
 
     def _do_register_service(self, service: Service) -> None:
         service_id = service.service_id
@@ -95,13 +121,7 @@ class ServiceRegister:
                 description='',
                 last_health_update=_utc_now()
             )
-            if self._health_check_thread is None:
-                self._health_check_thread = Thread(
-                    target=self._health_check_thread_entrypoint,
-                    name="grpc-router-health-check",
-                    daemon=True,
-                )
-                self._health_check_thread.start()
+            self._ensure_health_check_thread()
 
     def register_service(
         self, service_id: str, host: str, port: int, region: str, slots: int, health_check_type: HealthCheckType
@@ -117,8 +137,30 @@ class ServiceRegister:
             health_check_type=health_check_type,
             service_token=service_token
         )
-        self._do_register_service(service)
+        with self._lock:
+            self._replace_dead_entries(service_id, host, port)
+            self._do_register_service(service)
+            self._changed()
         return service_token, error_str
+
+    def _replace_dead_entries(self, service_id: str, host: str, port: int) -> None:
+        now = _utc_now()
+
+        def same_address(svc: Service) -> bool:
+            return svc.host == host and svc.port == port
+
+        for entry in list(self._register.get(service_id, {}).values()):
+            for svc in [svc for svc in entry if same_address(svc)]:
+                info = self._health_register.get(svc.service_token)
+                if (
+                    svc.health_check_type == HealthCheckType.NONE
+                    or info is None
+                    or (now - info.last_health_update).total_seconds() > self._config.health_check_timeout
+                ):
+                    self._remove_from_rotation(service_id, svc.service_token)
+        for token, info in list(self._unhealthy_services.items()):
+            if info.service.service_id == service_id and same_address(info.service):
+                del self._unhealthy_services[token]
 
     def resolve_service(self, service_id: str, service_token: str) -> Service | None:
         with self._lock:
@@ -158,6 +200,8 @@ class ServiceRegister:
         with self._lock:
             if self._remove_from_rotation(info.service.service_id, info.service.service_token):
                 self._unhealthy_services[info.service.service_token] = info
+                self._ensure_health_check_thread()
+                self._changed()
 
     def _get_out_of_service(self, service_id: str, service_token: str) -> HealthRegisterInfo | None:
         info = self._unhealthy_services.get(service_token)
@@ -173,6 +217,8 @@ class ServiceRegister:
             if info is not None:
                 del self._unhealthy_services[service_token]
                 svc = info.service
+            if svc is not None:
+                self._changed()
             return svc
 
     def mark_service_unhealthy(self, service_id: str, service_token: str) -> None:
@@ -222,6 +268,7 @@ class ServiceRegister:
             elif svc.health_check_type == HealthCheckType.NONE:
                 return svc
 
+            previous = self._health_register.get(service_token) if in_service else self._unhealthy_services[service_token]
             info = HealthRegisterInfo(
                 service=svc, health_status=health_status, description=description, last_health_update=_utc_now()
             )
@@ -234,5 +281,71 @@ class ServiceRegister:
                 if not in_service:
                     del self._unhealthy_services[service_token]
                     self._do_register_service(svc)
+                    self._changed()
                 self._health_register[service_token] = info
+            if previous is None or (previous.health_status, previous.description) != (health_status, description):
+                self._changed()
             return svc
+
+    # --- persistence -----------------------------------------------------------------
+
+    def snapshot(self) -> list[dict[str, Any]]:
+        """All the instances as plain data, in service ones in round robin order."""
+        def to_dict(svc: Service, in_service: bool, info: HealthRegisterInfo | None) -> dict[str, Any]:
+            return {
+                "service_id": svc.service_id,
+                "host": svc.host,
+                "port": svc.port,
+                "region": svc.region,
+                "slots": svc.slots,
+                "health_check_type": HealthCheckType(svc.health_check_type).name,
+                "service_token": svc.service_token,
+                "in_service": in_service,
+                "health_status": info.health_status.name if info else HealthStatus.UNKNOWN.name,
+                "description": info.description if info else "",
+            }
+
+        with self._lock:
+            instances = [
+                to_dict(svc, True, self._health_register.get(svc.service_token))
+                for regions in self._register.values()
+                for entry in regions.values()
+                for svc in entry
+            ]
+            instances += [to_dict(info.service, False, info) for info in self._unhealthy_services.values()]
+            return instances
+
+    def restore(self, instances: list[dict[str, Any]]) -> None:
+        """Load instances from snapshot(). Health checked instances get a full
+        health_check_timeout (in service) or unhealthy_expiry_timeout (out of service)
+        from now to send a heartbeat, whatever the age of the snapshot."""
+        # validate everything first, so that a bad entry does not leave a partial restore
+        parsed = [
+            (
+                Service(
+                    service_id=str(data["service_id"]),
+                    host=str(data["host"]),
+                    port=int(data["port"]),
+                    region=str(data["region"]),
+                    slots=int(data["slots"]),
+                    health_check_type=HealthCheckType[data["health_check_type"]],
+                    service_token=str(data["service_token"]),
+                ),
+                bool(data["in_service"]),
+                HealthStatus[data["health_status"]],
+                str(data["description"]),
+            )
+            for data in instances
+        ]
+        with self._lock:
+            for svc, in_service, status, description in parsed:
+                if in_service:
+                    self._do_register_service(svc)
+                    if svc.health_check_type != HealthCheckType.NONE:
+                        info = self._health_register[svc.service_token]
+                        info.health_status, info.description = status, description
+                elif svc.health_check_type != HealthCheckType.NONE:
+                    self._unhealthy_services[svc.service_token] = HealthRegisterInfo(
+                        service=svc, health_status=status, description=description, last_health_update=_utc_now(),
+                    )
+                    self._ensure_health_check_thread()
