@@ -40,6 +40,14 @@ service GRPCRouterService {
     // push health info to the grpc router.
     // Clients using this method must specify health check type ACTIVE_CLIENT
     // when registering.
+    //
+    // A service that misses heartbeats for longer than the router's health check timeout,
+    // or that reports HEALTH_STATUS_ERROR, is taken out of service: it is no longer returned
+    // by GetRegisteredService. It keeps its service_token and should keep pushing (ERROR
+    // included) while it is out of service; it goes back in service as soon as it pushes any
+    // status other than HEALTH_STATUS_ERROR. A service that is out of service and pushes
+    // nothing for longer than the router's expiry timeout is forgotten, and gets NOT_FOUND
+    // until it registers again.
     rpc PushHealthStatus(HealthInfoRequest) returns (HealthInfoResponse) {}
 
 }

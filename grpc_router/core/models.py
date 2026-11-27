@@ -25,6 +25,8 @@ class ConfigOptions:
     allow_cross_region_connectivity: bool = True
 
     health_check_timeout: int = 300  # in seconds
+    # seconds without any health push after which an out of service instance is forgotten
+    unhealthy_expiry_timeout: int = 900
 
     shutdown_grace: float = 5.0  # in seconds, for in-flight requests on SIGTERM/SIGINT
 

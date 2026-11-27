@@ -144,3 +144,26 @@ def test_client_heartbeats_survive_push_failures():
     client.close()
     assert stub.PushHealthStatus.call_count >= 4
     assert stub.PushHealthStatus.call_args.args[0].service_token == "token1"
+
+
+@mock.patch('grpc_router.core.register.ServiceRegister.HEALTH_CHECK_LATENCY_SECONDS', new=1)
+@mock.patch.object(GRPCRouterClient, 'HEALTH_PUSH_FREQUENCY_SECONDS', new=0.5)
+def test_client_reports_error_then_recovers(grpc_router_server_push_health_2s, caplog):
+    service_id = "client.error.service"
+    service = GRPCRouterClient("localhost", 7655)
+    service.register_service(service_id, "error.mydomain.com", 4324, '', 10, HealthCheckType.ACTIVE_CLIENT)
+    client = GRPCRouterClient("localhost", 7655)
+    assert client.get_service(service_id) == ("error.mydomain.com", 4324)
+
+    service.set_health_status(service_id, HealthStatus.ERROR, "Database down.")
+    time.sleep(3)  # several ERROR heartbeats, and past the 2s health check timeout
+    with pytest.raises(grpc.RpcError) as exc:
+        client.get_service(service_id)
+    assert exc.value.code() == grpc.StatusCode.NOT_FOUND
+    # the router accepts the heartbeats of an out of service instance
+    assert "Failed to publish health status" not in caplog.text
+
+    service.set_health_status(service_id, HealthStatus.GOOD, "")
+    time.sleep(1)
+    assert client.get_service(service_id) == ("error.mydomain.com", 4324)
+    service.close()

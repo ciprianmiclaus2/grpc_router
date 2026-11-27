@@ -69,5 +69,10 @@ host, port = router.get_service("myorg.billing.invoices", region="us-east")
 ```
 
 Instances of the same service are returned round robin, preferring the client's own region.
+
+With `HealthCheckType.ACTIVE_CLIENT` the client sends heartbeats to the router. A service that misses
+heartbeats, or reports an error with `set_health_status(service_id, HEALTH_STATUS_ERROR, "why")`, is taken
+out of service until it reports a healthy status again (`HEALTH_STATUS_GOOD` or `HEALTH_STATUS_WARNING`,
+from `grpc_router.stubs.grpc_router_service_pb2`).
 The router also exposes the standard gRPC health checking service, and server reflection (both v1 and v1alpha)
 so tools like `grpcurl` can list and describe its API.

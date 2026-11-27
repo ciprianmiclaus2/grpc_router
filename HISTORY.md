@@ -20,6 +20,13 @@
 * `GRPCRouterClient` caches its stub, and gains `close()` and context manager support.
 * `GRPCRouterClient.HEALTh_PUSh_FREQUENCY_SECONDS` renamed to `HEALTH_PUSH_FREQUENCY_SECONDS`
   (the old name is kept as a deprecated alias).
+* Reporting `HEALTH_STATUS_ERROR` now takes an `ACTIVE_CLIENT` service out of service (previously the status was
+  stored but the service was still handed out). As after missed heartbeats, it keeps its token and goes back in service
+  when it pushes any other status. Its `ERROR` heartbeats are now accepted while it is out of service (they used to
+  fail with NOT_FOUND).
+* Out of service instances are forgotten after `ConfigOptions.unhealthy_expiry_timeout` seconds (default 900) without
+  any health push; they used to be kept forever (a memory leak). Deregistering an out of service instance now removes it.
+* Re-registration by health push now checks that the token belongs to the pushed `service_id`.
 * Fix `ACTIVE_CLIENT` heartbeats: the client's heartbeat thread exited the first time `HEALTH_PUSH_FREQUENCY_SECONDS`
   (3 minutes) passed without a `set_health_status()` call, so services that did not keep calling it stopped sending
   heartbeats and were evicted by the router after `health_check_timeout` (5 minutes). The client now pushes
