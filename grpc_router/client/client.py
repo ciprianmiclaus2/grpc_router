@@ -55,6 +55,7 @@ class GRPCRouterClient:
         self._service_register: dict[str, dict[str, Any]] = {}
 
         self._health_event = Event()
+        self._health_push_stop = Event()
         self._health_push_thread: Thread | None = None
 
     @property
@@ -73,11 +74,19 @@ class GRPCRouterClient:
         return self._stub
 
     def close(self) -> None:
-        """Close the underlying channel. Registered services are not deregistered."""
+        """Stop pushing health statuses and close the channel. Services are not deregistered."""
+        thread = self._health_push_thread
+        if thread is not None:
+            self._health_push_stop.set()
+            self._health_event.set()
         if self._channel is not None:
-            self._channel.close()
-            self._channel = None
-            self._stub = None
+            self._channel.close()  # also cancels a push in flight, so the join below is quick
+        if thread is not None:
+            thread.join()
+            self._health_push_thread = None
+        # reset only after the push thread is gone, so it cannot reopen the channel
+        self._channel = None
+        self._stub = None
 
     def __enter__(self) -> Self:
         return self
@@ -91,9 +100,16 @@ class GRPCRouterClient:
         self.close()
 
     def _health_push_thread_entrypoint(self) -> None:
-        while self._health_event.wait(self.HEALTH_PUSH_FREQUENCY_SECONDS):
+        # Push every HEALTH_PUSH_FREQUENCY_SECONDS (the heartbeat), or straight away when
+        # set_health_status() changes a status, until the client is closed.
+        while True:
+            self._health_event.wait(self.HEALTH_PUSH_FREQUENCY_SECONDS)
+            if self._health_push_stop.is_set():
+                return
             self._health_event.clear()
             for service_id, svc in list(self._service_register.items()):
+                if self._health_push_stop.is_set():
+                    return
                 if svc["health_check_type"] == HEALTH_CHECK_ACTIVE_CLIENT:
                     try:
                         self.stub.PushHealthStatus(
@@ -110,6 +126,7 @@ class GRPCRouterClient:
     def _start_health_push_thread(self) -> None:
         if self._health_push_thread is None:
             self._health_event.clear()
+            self._health_push_stop.clear()
             self._health_push_thread = Thread(
                 target=self._health_push_thread_entrypoint,
                 name="grpc-router-health-push",

@@ -104,3 +104,43 @@ def test_client_active_health_register_miss_heartbeat_no_reregister(grpc_router_
     host, port = client2.get_service(service_id)
     assert host == "myhost2.mydomain3.com"
     assert port == 4321
+
+
+@mock.patch('grpc_router.core.register.ServiceRegister.HEALTH_CHECK_LATENCY_SECONDS', new=1)
+@mock.patch.object(GRPCRouterClient, 'HEALTH_PUSH_FREQUENCY_SECONDS', new=0.5)
+def test_client_heartbeats_keep_service_registered(grpc_router_server_push_health_2s):
+    # the client pushes periodic heartbeats on its own, without set_health_status() calls
+    service_id = "client.heartbeat.service"
+    client1 = GRPCRouterClient("localhost", 7655)
+    client1.register_service(service_id, "heartbeat.mydomain.com", 4323, '', 10, HealthCheckType.ACTIVE_CLIENT)
+
+    client2 = GRPCRouterClient("localhost", 7655)
+    for _ in range(5):
+        time.sleep(1)  # well past the 2s health check timeout overall
+        assert client2.get_service(service_id) == ("heartbeat.mydomain.com", 4323)
+
+    # closing the client stops the heartbeats, so the server evicts the service
+    push_thread = client1._health_push_thread
+    client1.close()
+    assert not push_thread.is_alive()
+    time.sleep(4)
+    with pytest.raises(grpc.RpcError) as exc:
+        client2.get_service(service_id)
+    assert exc.value.code() == grpc.StatusCode.NOT_FOUND
+
+
+@mock.patch.object(GRPCRouterClient, 'HEALTH_PUSH_FREQUENCY_SECONDS', new=0.05)
+def test_client_heartbeats_survive_push_failures():
+    # e.g. the router is restarting: a failed push must not stop later heartbeats
+    client = GRPCRouterClient("localhost", 1)
+    client._stub = stub = mock.Mock()
+    stub.RegisterService.return_value.service_token = "token1"
+    stub.PushHealthStatus.side_effect = [grpc.RpcError(), RuntimeError("boom"), None, None]
+    client.register_service("svc", "host", 1234, health_check_type=HealthCheckType.ACTIVE_CLIENT)
+
+    deadline = time.monotonic() + 5
+    while stub.PushHealthStatus.call_count < 4 and time.monotonic() < deadline:
+        time.sleep(0.05)
+    client.close()
+    assert stub.PushHealthStatus.call_count >= 4
+    assert stub.PushHealthStatus.call_args.args[0].service_token == "token1"

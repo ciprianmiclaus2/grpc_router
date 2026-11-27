@@ -20,6 +20,10 @@
 * `GRPCRouterClient` caches its stub, and gains `close()` and context manager support.
 * `GRPCRouterClient.HEALTh_PUSh_FREQUENCY_SECONDS` renamed to `HEALTH_PUSH_FREQUENCY_SECONDS`
   (the old name is kept as a deprecated alias).
+* Fix `ACTIVE_CLIENT` heartbeats: the client's heartbeat thread exited the first time `HEALTH_PUSH_FREQUENCY_SECONDS`
+  (3 minutes) passed without a `set_health_status()` call, so services that did not keep calling it stopped sending
+  heartbeats and were evicted by the router after `health_check_timeout` (5 minutes). The client now pushes
+  heartbeats periodically until `close()`, which also stops the heartbeat thread.
 * Fix the PushHealthStatus error message for an empty token ("service_token", was "service_context").
 * Fix a race where concurrent registrations could start more than one health check thread.
 * Ship type information (`py.typed` and generated `.pyi` stubs for the protobuf messages).

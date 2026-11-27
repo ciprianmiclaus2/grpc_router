@@ -88,3 +88,35 @@ def test_client_context_manager(grpc_router_server):
         assert client.get_service("ctx.manager.service") == ("ctxhost", 5555)
         client.deregister_service("ctx.manager.service")
     assert client._channel is None
+
+
+def test_deregister_one_instance_keeps_the_others(grpc_router_server):
+    service_id = "partial.deregistration.service"
+    east = GRPCRouterClient("localhost", 7654)
+    west = GRPCRouterClient("localhost", 7654)
+    east.register_service(service_id, "east.mydomain.com", 9101, region="USEast")
+    west.register_service(service_id, "west.mydomain.com", 9102, region="USWest")
+
+    east.deregister_service(service_id)
+
+    client = GRPCRouterClient("localhost", 7654)
+    # the deregistered instance is gone from its region and from the cross region fallback
+    for region in ("USWest", "USEast", "EU", "EU", ""):
+        assert client.get_service(service_id, region=region) == ("west.mydomain.com", 9102)
+    west.deregister_service(service_id)
+
+
+def test_register_same_service_twice_is_idempotent(grpc_router_server):
+    service_id = "idempotent.registration.service"
+    client1 = GRPCRouterClient("localhost", 7654)
+    client2 = GRPCRouterClient("localhost", 7654)
+    token = client1.register_service(service_id, "host1.mydomain.com", 9201)
+    assert client1.register_service(service_id, "host1.mydomain.com", 9201) == token
+    client2.register_service(service_id, "host2.mydomain.com", 9202)
+
+    # a duplicate registration would give host1 two slots in the round robin
+    client = GRPCRouterClient("localhost", 7654)
+    hosts = [client.get_service(service_id)[0] for _ in range(4)]
+    assert hosts == ["host1.mydomain.com", "host2.mydomain.com"] * 2
+    client1.deregister_service(service_id)
+    client2.deregister_service(service_id)
