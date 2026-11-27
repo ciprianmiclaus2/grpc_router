@@ -3,12 +3,25 @@ from enum import IntEnum
 
 
 class HealthCheckType(IntEnum):
+    """How the router checks that a registered service is alive.
+
+    Attributes:
+        NONE: No health checks: the service stays registered until it deregisters.
+        ACTIVE_CLIENT: The service pushes heartbeats to the router (`GRPCRouterClient` does it).
+        PASSIVE_CLIENT: The router polls the service. Not implemented yet.
+    """
+
     NONE = 0
     ACTIVE_CLIENT = 1
     PASSIVE_CLIENT = 2
 
 
 class HealthStatus(IntEnum):
+    """Health status a service reports with its heartbeats.
+
+    `ERROR` takes the service out of service; any other status keeps it in, or puts it back in, service.
+    """
+
     UNKNOWN = 0
     GOOD = 1
     WARNING = 2
@@ -17,6 +30,26 @@ class HealthStatus(IntEnum):
 
 @dataclass
 class ConfigOptions:
+    """Configuration of the router.
+
+    Attributes:
+        hostname: Hostname or address to bind to, e.g. `"[::]"` for all interfaces.
+        port: Port to bind to.
+        max_workers: Maximum number of requests handled concurrently.
+        allow_global_region: Allow services to register without a region (the global region), and
+            fall back to global services when a client's region has none.
+        allow_cross_region_connectivity: Fall back to services of other regions when neither the
+            client's region nor the global region has any.
+        health_check_timeout: Seconds without a heartbeat after which an `ACTIVE_CLIENT` service is
+            taken out of service.
+        unhealthy_expiry_timeout: Seconds without any health push after which an out of service
+            instance is forgotten; it then has to register again.
+        shutdown_grace: Seconds in-flight requests get to complete on SIGTERM/SIGINT.
+        state_file: Path of the JSON file to save the register to and reload it from on start;
+            `None` disables persistence.
+        state_save_interval: The state file is saved at most once per this many seconds.
+    """
+
     hostname: str
     port: int
     max_workers: int

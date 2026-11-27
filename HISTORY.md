@@ -49,6 +49,8 @@ stop sending heartbeats after 3 minutes (see Fixes).
   signal stops immediately. The router now logs startup, shutdown and state restores.
 * Server reflection is served as both `grpc.reflection.v1` and `grpc.reflection.v1alpha`, so clients that only
   speak v1 (recent grpcurl, Postman, etc.) work.
+* Documentation site: https://ciprianmiclaus2.github.io/grpc_router/ (running the router, health checks, gRPC and
+  Python API).
 * `grpc-router` command line entry point to start the router.
 * `grpc_router.server.create_server(config)` builds a router without blocking (`serve` still blocks).
 * `GRPCRouterClient` caches its stub, and gains `close()` and context manager support.
@@ -58,8 +60,8 @@ stop sending heartbeats after 3 minutes (see Fixes).
 
 * `[build-system]` table, SPDX license metadata, PEP 735 dependency groups (`pip install -e . --group dev`),
   sdist with the tests, proto and stub generation script.
-* ruff replaces flake8; GitHub Actions updated, with a test matrix for Python 3.11 to 3.15, a minimum versions job
-  and a packaging job.
+* ruff replaces flake8; GitHub Actions updated, with a test matrix for Python 3.11 to 3.15, a minimum versions job,
+  a packaging job and a docs build; the docs are published to GitHub Pages on each release.
 
 ## 0.3.0 (2024-11-02)
 

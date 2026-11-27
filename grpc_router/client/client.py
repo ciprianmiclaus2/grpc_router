@@ -21,6 +21,21 @@ logger = logging.getLogger(__name__)
 
 
 class GRPCRouterClient:
+    """Client of the grpc router, for services (to register) and for their clients (to look them up).
+
+    Registered `ACTIVE_CLIENT` services get heartbeats sent in a background thread every
+    `HEALTH_PUSH_FREQUENCY_SECONDS`, and straight away when `set_health_status` is called. If the
+    router no longer knows a service (it restarted without a state file, or the service was out of
+    service and silent for too long), the client registers it again on its next heartbeat.
+
+    Use it as a context manager, or call `close` when done, to stop the heartbeats and close the channel.
+
+    Args:
+        host: Host of the router.
+        port: Port of the router.
+        grpc_service_config: gRPC service config for the channel, e.g. its retry policy. Defaults to
+            `DEFAULT_GRPC_SERVICE_CONFIG`, which retries failed calls up to 5 times with backoff.
+    """
 
     DEFAULT_GRPC_SERVICE_CONFIG = {
         "methodConfig": [{
@@ -61,6 +76,7 @@ class GRPCRouterClient:
 
     @property
     def channel(self) -> grpc.Channel:
+        """The gRPC channel to the router, created on first use."""
         if self._channel is None:
             options = None
             if self._grpc_service_config:
@@ -70,6 +86,7 @@ class GRPCRouterClient:
 
     @property
     def stub(self) -> GRPCRouterServiceStub:
+        """The generated gRPC stub of the router service, for direct calls."""
         if self._stub is None:
             self._stub = GRPCRouterServiceStub(self.channel)
         return self._stub
@@ -169,6 +186,22 @@ class GRPCRouterClient:
     def register_service(
         self, service_id: str, host: str, port: int, region: str = "", slots: int = 10, health_check_type: int = 0
     ) -> str:
+        """Register a service instance with the router.
+
+        Registering the same service_id again with the same client is a no-op that returns the
+        existing token.
+
+        Args:
+            service_id: Name of the service, ideally a dot separated namespace, e.g. `"myorg.billing.invoices"`.
+            host: Host clients connect to.
+            port: Port clients connect to.
+            region: Region of the instance; `""` is the global region.
+            slots: Capacity hint of the instance (not used by the router yet).
+            health_check_type: A `HealthCheckType`; `ACTIVE_CLIENT` starts sending heartbeats.
+
+        Returns:
+            The service token. It can change if the client has to register the service again.
+        """
         with self._register_lock:
             svc = self._service_register.get(service_id)
         if svc is not None:
@@ -195,6 +228,7 @@ class GRPCRouterClient:
         return token
 
     def deregister_service(self, service_id: str) -> None:
+        """Deregister a service registered by this client (no-op if it is not registered)."""
         with self._register_lock:
             svc = self._service_register.pop(service_id, None)
         if svc is None:
@@ -205,12 +239,32 @@ class GRPCRouterClient:
         self.stub.DeregisterService(request)
 
     def get_service(self, service_id: str, region: str = "") -> tuple[str, int]:
+        """Look up an instance of a service, round robin.
+
+        The router prefers instances of the given region, then of the global region, then of any
+        region, depending on its configuration.
+
+        Returns:
+            The `(host, port)` to connect to.
+
+        Raises:
+            grpc.RpcError: With code `NOT_FOUND` if no instance is in service.
+        """
         request = GetRegisteredServiceRequest(service_id=service_id)
         request.hints.region = region
         res = self.stub.GetRegisteredService(request)
         return res.endpoint.host, res.endpoint.port
 
     def set_health_status(self, service_id: str, status: int, description: str) -> None:
+        """Set the health status of a service registered by this client, and push it straight away.
+
+        `HealthStatus.ERROR` takes the service out of service until a healthy status is set again.
+
+        Args:
+            service_id: The registered service.
+            status: A `HealthStatus` (or the equivalent `HEALTH_STATUS_*` value of the generated stubs).
+            description: Free text, e.g. why the service is unhealthy.
+        """
         svc = self._service_register.get(service_id)
         if svc is None:
             return

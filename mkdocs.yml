@@ -1,0 +1,73 @@
+site_name: GRPC Router
+site_description: A simple gRPC service register for client side service discovery.
+site_url: https://ciprianmiclaus2.github.io/grpc_router/
+repo_url: https://github.com/ciprianmiclaus2/grpc_router
+repo_name: grpc_router
+strict: true
+nav:
+  - Home: index.md
+  - Running the router: router.md
+  - Health checks: health-checks.md
+  - gRPC API: grpc-api.md
+  - Python API:
+      - api/index.md
+      - Client: api/client.md
+      - Server and configuration: api/server.md
+  - Contributing: contributing.md
+  - Authors: authors.md
+  - History: history.md
+extra_css:
+  - stylesheets/extra.css
+theme:
+  name: material
+  language: en
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+  features:
+    - navigation.indexes
+    - navigation.instant
+    - content.code.copy
+markdown_extensions:
+  - admonition
+  - attr_list
+  - pymdownx.details
+  - pymdownx.highlight
+  - pymdownx.superfences
+  - toc:
+      permalink: true
+plugins:
+  - search:
+      lang: en
+  - include-markdown
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            docstring_style: google
+            show_root_heading: true
+            show_root_full_path: false
+            show_source: false
+            show_bases: false
+            separate_signature: true
+            show_signature_annotations: true
+            members_order: source
+            filters: ["!^_"]
+            heading_level: 2
+watch:
+  - grpc_router
+extra:
+  version:
+    provider: mike
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/ciprianmiclaus2/grpc_router
+      name: GitHub

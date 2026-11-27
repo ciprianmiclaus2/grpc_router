@@ -114,6 +114,14 @@ To run the tests:
     $ pytest -vv tests/
 ```
 
+To build and preview the documentation (http://127.0.0.1:8000):
+
+```
+    $ mkdocs serve
+```
+
+The docs are published to GitHub Pages by the Documentation workflow when a release is published.
+
 If you change `proto/grpc_router_service.proto`, regenerate the stubs with:
 
 ```
@@ -138,4 +146,5 @@ $ git push --tags
 ```
 
 Then publish a GitHub release for the tag; GitHub Actions builds the package
-and uploads it to PyPI (trusted publishing).
+and uploads it to PyPI (trusted publishing), and publishes the docs for the
+release's minor version to GitHub Pages (the gh-pages branch).

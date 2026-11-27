@@ -41,7 +41,7 @@ grpc-router = "grpc_router.server:main"
 
 [project.urls]
 homepage = "https://github.com/ciprianmiclaus2/grpc_router"
-documentation = "https://github.com/ciprianmiclaus2/grpc_router#readme"
+documentation = "https://ciprianmiclaus2.github.io/grpc_router/"
 repository = "https://github.com/ciprianmiclaus2/grpc_router"
 history = "https://github.com/ciprianmiclaus2/grpc_router/blob/main/HISTORY.md"
 
@@ -50,11 +50,22 @@ test = [
     "pytest>=8",
     "pytest-cov",
 ]
+lint = [
+    "ruff==0.17.6",  # pinned: new ruff releases can add rules to the selected categories
+]
+docs = [
+    "mkdocs>=1.6,<2",
+    "mkdocs-include-markdown-plugin>=7,<8",
+    "mkdocs-material>=9.5,<10",
+    "mkdocstrings[python]>=1,<2",
+    "mike>=2,<3",
+]
 dev = [
     {include-group = "test"},
+    {include-group = "lint"},
+    {include-group = "docs"},
     "grpcio-tools",
     "build",
-    "ruff",
 ]
 
 [tool.setuptools.packages.find]
