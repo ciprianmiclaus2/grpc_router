@@ -3,17 +3,15 @@ from collections.abc import Iterator
 import pytest
 
 from grpc_router.core.models import ConfigOptions
-from grpc_router.server import create_server
+from grpc_router.server import BackgroundRouter
 
 
 def _run_server(port: int, **config_kwargs) -> Iterator[None]:
-    config = ConfigOptions(hostname="localhost", port=port, max_workers=1, **config_kwargs)
-    server = create_server(config)
-    server.start()
+    router = BackgroundRouter(ConfigOptions(hostname="localhost", port=port, **config_kwargs)).start()
     try:
         yield
     finally:
-        server.stop(grace=None)
+        router.stop()
 
 
 @pytest.fixture(scope="session")

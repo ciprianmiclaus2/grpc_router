@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "grpc_router"
-version = "0.4.0"
+version = "0.5.0"
 description = "A simple grpc router to establish a simple grpc mesh."
 authors = [{name = "Ciprian Miclaus", email = "ciprianm@gmail.com"}]
 readme = "README.md"

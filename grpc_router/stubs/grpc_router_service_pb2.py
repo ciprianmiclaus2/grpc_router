@@ -24,7 +24,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n+grpc_router/stubs/grpc_router_service.proto\x12\ngrpcrouter\"-\n\x0fServiceEndpoint\x12\x0c\n\x04host\x18\x01 \x01(\t\x12\x0c\n\x04port\x18\x02 \x01(\x05\"h\n\x0fServiceMetadata\x12\x0e\n\x06region\x18\x01 \x01(\t\x12\r\n\x05slots\x18\x02 \x01(\x05\x12\x36\n\x11health_check_type\x18\x03 \x01(\x0e\x32\x1b.grpcrouter.HealthCheckType\"\x8e\x01\n\x1aServiceRegistrationRequest\x12\x12\n\nservice_id\x18\x01 \x01(\t\x12-\n\x08\x65ndpoint\x18\x02 \x01(\x0b\x32\x1b.grpcrouter.ServiceEndpoint\x12-\n\x08metadata\x18\x03 \x01(\x0b\x32\x1b.grpcrouter.ServiceMetadata\"4\n\x1bServiceRegistrationResponse\x12\x15\n\rservice_token\x18\x01 \x01(\t\"I\n\x1cServiceDeregistrationRequest\x12\x12\n\nservice_id\x18\x01 \x01(\t\x12\x15\n\rservice_token\x18\x02 \x01(\t\"\x1f\n\x1dServiceDeregistrationResponse\"\x1e\n\x0cServiceHints\x12\x0e\n\x06region\x18\x01 \x01(\t\"Z\n\x1bGetRegisteredServiceRequest\x12\x12\n\nservice_id\x18\x01 \x01(\t\x12\'\n\x05hints\x18\x02 \x01(\x0b\x32\x18.grpcrouter.ServiceHints\"a\n\x1cGetRegisteredServiceResponse\x12\x12\n\nservice_id\x18\x01 \x01(\t\x12-\n\x08\x65ndpoint\x18\x02 \x01(\x0b\x32\x1b.grpcrouter.ServiceEndpoint\"}\n\x11HealthInfoRequest\x12\x12\n\nservice_id\x18\x01 \x01(\t\x12\x15\n\rservice_token\x18\x02 \x01(\t\x12(\n\x06status\x18\x03 \x01(\x0e\x32\x18.grpcrouter.HealthStatus\x12\x13\n\x0b\x64\x65scription\x18\x04 \x01(\t\"\x14\n\x12HealthInfoResponse*i\n\x0fHealthCheckType\x12\x15\n\x11HEALTH_CHECK_NONE\x10\x00\x12\x1e\n\x1aHEALTH_CHECK_ACTIVE_CLIENT\x10\x01\x12\x1f\n\x1bHEALTH_CHECK_PASSIVE_CLIENT\x10\x02*u\n\x0cHealthStatus\x12\x19\n\x15HEALTH_STATUS_UNKNOWN\x10\x00\x12\x16\n\x12HEALTH_STATUS_GOOD\x10\x01\x12\x19\n\x15HEALTH_STATUS_WARNING\x10\x02\x12\x17\n\x13HEALTH_STATUS_ERROR\x10\x03\x32\xa7\x03\n\x11GRPCRouterService\x12\x64\n\x0fRegisterService\x12&.grpcrouter.ServiceRegistrationRequest\x1a\'.grpcrouter.ServiceRegistrationResponse\"\x00\x12j\n\x11\x44\x65registerService\x12(.grpcrouter.ServiceDeregistrationRequest\x1a).grpcrouter.ServiceDeregistrationResponse\"\x00\x12k\n\x14GetRegisteredService\x12\'.grpcrouter.GetRegisteredServiceRequest\x1a(.grpcrouter.GetRegisteredServiceResponse\"\x00\x12S\n\x10PushHealthStatus\x12\x1d.grpcrouter.HealthInfoRequest\x1a\x1e.grpcrouter.HealthInfoResponse\"\x00\x42\x1a\n\x16\x63om.grpcrouter.serviceP\x01\x62\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n+grpc_router/stubs/grpc_router_service.proto\x12\ngrpcrouter\"-\n\x0fServiceEndpoint\x12\x0c\n\x04host\x18\x01 \x01(\t\x12\x0c\n\x04port\x18\x02 \x01(\x05\"h\n\x0fServiceMetadata\x12\x0e\n\x06region\x18\x01 \x01(\t\x12\r\n\x05slots\x18\x02 \x01(\x05\x12\x36\n\x11health_check_type\x18\x03 \x01(\x0e\x32\x1b.grpcrouter.HealthCheckType\"\x8e\x01\n\x1aServiceRegistrationRequest\x12\x12\n\nservice_id\x18\x01 \x01(\t\x12-\n\x08\x65ndpoint\x18\x02 \x01(\x0b\x32\x1b.grpcrouter.ServiceEndpoint\x12-\n\x08metadata\x18\x03 \x01(\x0b\x32\x1b.grpcrouter.ServiceMetadata\"4\n\x1bServiceRegistrationResponse\x12\x15\n\rservice_token\x18\x01 \x01(\t\"I\n\x1cServiceDeregistrationRequest\x12\x12\n\nservice_id\x18\x01 \x01(\t\x12\x15\n\rservice_token\x18\x02 \x01(\t\"\x1f\n\x1dServiceDeregistrationResponse\"\x1e\n\x0cServiceHints\x12\x0e\n\x06region\x18\x01 \x01(\t\"Z\n\x1bGetRegisteredServiceRequest\x12\x12\n\nservice_id\x18\x01 \x01(\t\x12\'\n\x05hints\x18\x02 \x01(\x0b\x32\x18.grpcrouter.ServiceHints\"\x91\x01\n\x1cGetRegisteredServiceResponse\x12\x12\n\nservice_id\x18\x01 \x01(\t\x12-\n\x08\x65ndpoint\x18\x02 \x01(\x0b\x32\x1b.grpcrouter.ServiceEndpoint\x12.\n\tinstances\x18\x03 \x03(\x0b\x32\x1b.grpcrouter.ServiceInstance\"}\n\x11HealthInfoRequest\x12\x12\n\nservice_id\x18\x01 \x01(\t\x12\x15\n\rservice_token\x18\x02 \x01(\t\x12(\n\x06status\x18\x03 \x01(\x0e\x32\x18.grpcrouter.HealthStatus\x12\x13\n\x0b\x64\x65scription\x18\x04 \x01(\t\"\x14\n\x12HealthInfoResponse\"P\n\x0fServiceInstance\x12-\n\x08\x65ndpoint\x18\x01 \x01(\x0b\x32\x1b.grpcrouter.ServiceEndpoint\x12\x0e\n\x06region\x18\x02 \x01(\t\"Z\n\x1bListServiceInstancesRequest\x12\x12\n\nservice_id\x18\x01 \x01(\t\x12\'\n\x05hints\x18\x02 \x01(\x0b\x32\x18.grpcrouter.ServiceHints\"b\n\x1cListServiceInstancesResponse\x12\x12\n\nservice_id\x18\x01 \x01(\t\x12.\n\tinstances\x18\x02 \x03(\x0b\x32\x1b.grpcrouter.ServiceInstance\"9\n\x13ServiceSubscription\x12\x12\n\nservice_id\x18\x01 \x01(\t\x12\x0e\n\x06region\x18\x02 \x01(\t\"\x80\x01\n\x14WatchServicesRequest\x12\x32\n\tsubscribe\x18\x01 \x03(\x0b\x32\x1f.grpcrouter.ServiceSubscription\x12\x34\n\x0bunsubscribe\x18\x02 \x03(\x0b\x32\x1f.grpcrouter.ServiceSubscription\"\x7f\n\x16ServiceInstancesUpdate\x12\x35\n\x0csubscription\x18\x01 \x01(\x0b\x32\x1f.grpcrouter.ServiceSubscription\x12.\n\tinstances\x18\x02 \x03(\x0b\x32\x1b.grpcrouter.ServiceInstance\"L\n\x15WatchServicesResponse\x12\x33\n\x07updates\x18\x01 \x03(\x0b\x32\".grpcrouter.ServiceInstancesUpdate*i\n\x0fHealthCheckType\x12\x15\n\x11HEALTH_CHECK_NONE\x10\x00\x12\x1e\n\x1aHEALTH_CHECK_ACTIVE_CLIENT\x10\x01\x12\x1f\n\x1bHEALTH_CHECK_PASSIVE_CLIENT\x10\x02*u\n\x0cHealthStatus\x12\x19\n\x15HEALTH_STATUS_UNKNOWN\x10\x00\x12\x16\n\x12HEALTH_STATUS_GOOD\x10\x01\x12\x19\n\x15HEALTH_STATUS_WARNING\x10\x02\x12\x17\n\x13HEALTH_STATUS_ERROR\x10\x03\x32\xf0\x04\n\x11GRPCRouterService\x12\x64\n\x0fRegisterService\x12&.grpcrouter.ServiceRegistrationRequest\x1a\'.grpcrouter.ServiceRegistrationResponse\"\x00\x12j\n\x11\x44\x65registerService\x12(.grpcrouter.ServiceDeregistrationRequest\x1a).grpcrouter.ServiceDeregistrationResponse\"\x00\x12k\n\x14GetRegisteredService\x12\'.grpcrouter.GetRegisteredServiceRequest\x1a(.grpcrouter.GetRegisteredServiceResponse\"\x00\x12k\n\x14ListServiceInstances\x12\'.grpcrouter.ListServiceInstancesRequest\x1a(.grpcrouter.ListServiceInstancesResponse\"\x00\x12Z\n\rWatchServices\x12 .grpcrouter.WatchServicesRequest\x1a!.grpcrouter.WatchServicesResponse\"\x00(\x01\x30\x01\x12S\n\x10PushHealthStatus\x12\x1d.grpcrouter.HealthInfoRequest\x1a\x1e.grpcrouter.HealthInfoResponse\"\x00\x42\x1a\n\x16\x63om.grpcrouter.serviceP\x01\x62\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -32,10 +32,10 @@ _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'grpc_router.stubs.grpc_rout
 if not _descriptor._USE_C_DESCRIPTORS:
   _globals['DESCRIPTOR']._loaded_options = None
   _globals['DESCRIPTOR']._serialized_options = b'\n\026com.grpcrouter.serviceP\001'
-  _globals['_HEALTHCHECKTYPE']._serialized_start=891
-  _globals['_HEALTHCHECKTYPE']._serialized_end=996
-  _globals['_HEALTHSTATUS']._serialized_start=998
-  _globals['_HEALTHSTATUS']._serialized_end=1115
+  _globals['_HEALTHCHECKTYPE']._serialized_start=1611
+  _globals['_HEALTHCHECKTYPE']._serialized_end=1716
+  _globals['_HEALTHSTATUS']._serialized_start=1718
+  _globals['_HEALTHSTATUS']._serialized_end=1835
   _globals['_SERVICEENDPOINT']._serialized_start=59
   _globals['_SERVICEENDPOINT']._serialized_end=104
   _globals['_SERVICEMETADATA']._serialized_start=106
@@ -52,12 +52,26 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['_SERVICEHINTS']._serialized_end=549
   _globals['_GETREGISTEREDSERVICEREQUEST']._serialized_start=551
   _globals['_GETREGISTEREDSERVICEREQUEST']._serialized_end=641
-  _globals['_GETREGISTEREDSERVICERESPONSE']._serialized_start=643
-  _globals['_GETREGISTEREDSERVICERESPONSE']._serialized_end=740
-  _globals['_HEALTHINFOREQUEST']._serialized_start=742
-  _globals['_HEALTHINFOREQUEST']._serialized_end=867
-  _globals['_HEALTHINFORESPONSE']._serialized_start=869
-  _globals['_HEALTHINFORESPONSE']._serialized_end=889
-  _globals['_GRPCROUTERSERVICE']._serialized_start=1118
-  _globals['_GRPCROUTERSERVICE']._serialized_end=1541
+  _globals['_GETREGISTEREDSERVICERESPONSE']._serialized_start=644
+  _globals['_GETREGISTEREDSERVICERESPONSE']._serialized_end=789
+  _globals['_HEALTHINFOREQUEST']._serialized_start=791
+  _globals['_HEALTHINFOREQUEST']._serialized_end=916
+  _globals['_HEALTHINFORESPONSE']._serialized_start=918
+  _globals['_HEALTHINFORESPONSE']._serialized_end=938
+  _globals['_SERVICEINSTANCE']._serialized_start=940
+  _globals['_SERVICEINSTANCE']._serialized_end=1020
+  _globals['_LISTSERVICEINSTANCESREQUEST']._serialized_start=1022
+  _globals['_LISTSERVICEINSTANCESREQUEST']._serialized_end=1112
+  _globals['_LISTSERVICEINSTANCESRESPONSE']._serialized_start=1114
+  _globals['_LISTSERVICEINSTANCESRESPONSE']._serialized_end=1212
+  _globals['_SERVICESUBSCRIPTION']._serialized_start=1214
+  _globals['_SERVICESUBSCRIPTION']._serialized_end=1271
+  _globals['_WATCHSERVICESREQUEST']._serialized_start=1274
+  _globals['_WATCHSERVICESREQUEST']._serialized_end=1402
+  _globals['_SERVICEINSTANCESUPDATE']._serialized_start=1404
+  _globals['_SERVICEINSTANCESUPDATE']._serialized_end=1531
+  _globals['_WATCHSERVICESRESPONSE']._serialized_start=1533
+  _globals['_WATCHSERVICESRESPONSE']._serialized_end=1609
+  _globals['_GRPCROUTERSERVICE']._serialized_start=1838
+  _globals['_GRPCROUTERSERVICE']._serialized_end=2462
 # @@protoc_insertion_point(module_scope)

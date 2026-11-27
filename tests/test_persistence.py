@@ -15,7 +15,7 @@ from grpc_router.core.persistence import StateWriter, load_state, save_state
 from grpc_router.core.register import ServiceRegister
 from grpc_router.stubs.grpc_router_service_pb2 import HEALTH_STATUS_GOOD, HealthInfoRequest
 
-CONFIG = ConfigOptions(hostname="localhost", port=0, max_workers=1)
+CONFIG = ConfigOptions(hostname="localhost", port=0)
 
 
 def _register_with_instances() -> tuple[ServiceRegister, list[str]]:

@@ -34,7 +34,26 @@ service GRPCRouterService {
     // The client specifies the service_id which is service register for.
     // When multiple services are registered for the same service_id, they are returned in a simple
     // round-robin fashion.
+    // The response also lists all the instances the client may use (as ListServiceInstances),
+    // so that clients can keep using them if the router becomes unreachable.
     rpc GetRegisteredService(GetRegisteredServiceRequest) returns (GetRegisteredServiceResponse) {}
+
+    // List the instances of a service
+    //
+    // Returns the instances that are in service and that a client in the hinted region may use:
+    // the ones of its region if any, else the ones of the global region (if allowed), else the
+    // ones of the other regions (if allowed). The same choice as GetRegisteredService, as a list.
+    // An empty list (not NOT_FOUND) when there are none.
+    rpc ListServiceInstances(ListServiceInstancesRequest) returns (ListServiceInstancesResponse) {}
+
+    // Watch the instances of services
+    //
+    // One stream per client for all the services it watches. The client sends subscriptions
+    // (service_id and region) and unsubscriptions at any time. For each new subscription, the
+    // router sends the same list as ListServiceInstances straight away, then again each time that
+    // list changes. The stream ends (with OK) when the router shuts down: clients should then
+    // connect again and subscribe again.
+    rpc WatchServices(stream WatchServicesRequest) returns (stream WatchServicesResponse) {}
 
 
     // Client pushes the health status periodically
@@ -117,6 +136,7 @@ message GetRegisteredServiceRequest {
 message GetRegisteredServiceResponse {
     string service_id = 1;
     ServiceEndpoint endpoint = 2;
+    repeated ServiceInstance instances = 3;  // all the instances the client may use, for caching
 }
 
 
@@ -128,4 +148,45 @@ message HealthInfoRequest {
 }
 
 message HealthInfoResponse{
+}
+
+
+message ServiceInstance {
+    ServiceEndpoint endpoint = 1;
+    string region = 2;
+}
+
+
+message ListServiceInstancesRequest {
+    string service_id = 1;
+    ServiceHints hints = 2;
+}
+
+
+message ListServiceInstancesResponse {
+    string service_id = 1;
+    repeated ServiceInstance instances = 2;
+}
+
+
+message ServiceSubscription {
+    string service_id = 1;
+    string region = 2;  // region of the client, as in ServiceHints
+}
+
+
+message WatchServicesRequest {
+    repeated ServiceSubscription subscribe = 1;
+    repeated ServiceSubscription unsubscribe = 2;
+}
+
+
+message ServiceInstancesUpdate {
+    ServiceSubscription subscription = 1;
+    repeated ServiceInstance instances = 2;  // the full list (empty: no instance in service)
+}
+
+
+message WatchServicesResponse {
+    repeated ServiceInstancesUpdate updates = 1;
 }

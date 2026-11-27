@@ -9,6 +9,12 @@ A service written in another language has to do what `GRPCRouterClient` does for
 `PushHealthStatus` regularly (well within the router's health check timeout, 5 minutes by default), and call
 `RegisterService` again when `PushHealthStatus` returns `NOT_FOUND`. See [Health checks](health-checks.md).
 
+To discover services, `ListServiceInstances` returns all the instances a client may use. `WatchServices` is one
+bidirectional stream per client: send (un)subscriptions for any number of `(service_id, region)` at any time,
+and receive the list of each subscription straight away and on every change. When the stream ends (the router
+shuts down) or fails, reconnect after a random delay, so that the clients of a restarted router do not all
+reconnect at once, and subscribe again. See [Discovering services](discovery.md).
+
 ```protobuf
 {%
   include "../proto/grpc_router_service.proto"

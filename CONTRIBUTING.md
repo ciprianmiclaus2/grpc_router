@@ -129,8 +129,8 @@ If you change `proto/grpc_router_service.proto`, regenerate the stubs with:
 ```
 
 Regenerating embeds the protobuf/grpcio versions of your grpcio-tools in the
-generated code, so bump the lower bounds in pyproject.toml to match (see the
-comments in gen_stubs.sh).
+generated code. Use grpcio-tools==1.66.2 to keep the current lower bounds, or
+bump them in pyproject.toml to match (see the comments in gen_stubs.sh).
 
 
 ## Deploying

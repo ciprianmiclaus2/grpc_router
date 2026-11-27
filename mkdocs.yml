@@ -7,11 +7,13 @@ strict: true
 nav:
   - Home: index.md
   - Running the router: router.md
+  - Discovering services: discovery.md
   - Health checks: health-checks.md
   - gRPC API: grpc-api.md
   - Python API:
       - api/index.md
       - Client: api/client.md
+      - Watches and channel pool: api/discovery.md
       - Server and configuration: api/server.md
   - Contributing: contributing.md
   - Authors: authors.md

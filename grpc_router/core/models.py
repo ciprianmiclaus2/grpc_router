@@ -34,8 +34,7 @@ class ConfigOptions:
 
     Attributes:
         hostname: Hostname or address to bind to, e.g. `"[::]"` for all interfaces.
-        port: Port to bind to.
-        max_workers: Maximum number of requests handled concurrently.
+        port: Port to bind to; 0 picks a free port (see `GRPCRouter.port`).
         allow_global_region: Allow services to register without a region (the global region), and
             fall back to global services when a client's region has none.
         allow_cross_region_connectivity: Fall back to services of other regions when neither the
@@ -50,9 +49,8 @@ class ConfigOptions:
         state_save_interval: The state file is saved at most once per this many seconds.
     """
 
-    hostname: str
-    port: int
-    max_workers: int
+    hostname: str = "[::]"
+    port: int = 50034
 
     allow_global_region: bool = True
     allow_cross_region_connectivity: bool = True

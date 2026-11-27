@@ -49,6 +49,16 @@ class GRPCRouterServiceStub(object):
                 request_serializer=grpc__router_dot_stubs_dot_grpc__router__service__pb2.GetRegisteredServiceRequest.SerializeToString,
                 response_deserializer=grpc__router_dot_stubs_dot_grpc__router__service__pb2.GetRegisteredServiceResponse.FromString,
                 _registered_method=True)
+        self.ListServiceInstances = channel.unary_unary(
+                '/grpcrouter.GRPCRouterService/ListServiceInstances',
+                request_serializer=grpc__router_dot_stubs_dot_grpc__router__service__pb2.ListServiceInstancesRequest.SerializeToString,
+                response_deserializer=grpc__router_dot_stubs_dot_grpc__router__service__pb2.ListServiceInstancesResponse.FromString,
+                _registered_method=True)
+        self.WatchServices = channel.stream_stream(
+                '/grpcrouter.GRPCRouterService/WatchServices',
+                request_serializer=grpc__router_dot_stubs_dot_grpc__router__service__pb2.WatchServicesRequest.SerializeToString,
+                response_deserializer=grpc__router_dot_stubs_dot_grpc__router__service__pb2.WatchServicesResponse.FromString,
+                _registered_method=True)
         self.PushHealthStatus = channel.unary_unary(
                 '/grpcrouter.GRPCRouterService/PushHealthStatus',
                 request_serializer=grpc__router_dot_stubs_dot_grpc__router__service__pb2.HealthInfoRequest.SerializeToString,
@@ -67,6 +77,9 @@ class GRPCRouterServiceServicer(object):
         the service but it can be anything, e.g.: org.suborg.scope1.service1
         It also has information about how clients can connect directly to the service (ie host/port)
         The service gets back a service_token which it can use to communicate with the grpc router.
+        A registration replaces the entries of the same service_id, host and port that look dead
+        (e.g. the same service restarted): entries that are out of service, that missed heartbeats or
+        that have no health checks.
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -90,6 +103,33 @@ class GRPCRouterServiceServicer(object):
         The client specifies the service_id which is service register for.
         When multiple services are registered for the same service_id, they are returned in a simple
         round-robin fashion.
+        The response also lists all the instances the client may use (as ListServiceInstances),
+        so that clients can keep using them if the router becomes unreachable.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def ListServiceInstances(self, request, context):
+        """List the instances of a service
+
+        Returns the instances that are in service and that a client in the hinted region may use:
+        the ones of its region if any, else the ones of the global region (if allowed), else the
+        ones of the other regions (if allowed). The same choice as GetRegisteredService, as a list.
+        An empty list (not NOT_FOUND) when there are none.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def WatchServices(self, request_iterator, context):
+        """Watch the instances of services
+
+        One stream per client for all the services it watches. The client sends subscriptions
+        (service_id and region) and unsubscriptions at any time. For each new subscription, the
+        router sends the same list as ListServiceInstances straight away, then again each time that
+        list changes. The stream ends (with OK) when the router shuts down: clients should then
+        connect again and subscribe again.
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -102,6 +142,14 @@ class GRPCRouterServiceServicer(object):
         push health info to the grpc router.
         Clients using this method must specify health check type ACTIVE_CLIENT
         when registering.
+
+        A service that misses heartbeats for longer than the router's health check timeout,
+        or that reports HEALTH_STATUS_ERROR, is taken out of service: it is no longer returned
+        by GetRegisteredService. It keeps its service_token and should keep pushing (ERROR
+        included) while it is out of service; it goes back in service as soon as it pushes any
+        status other than HEALTH_STATUS_ERROR. A service that is out of service and pushes
+        nothing for longer than the router's expiry timeout is forgotten, and gets NOT_FOUND
+        until it registers again.
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -124,6 +172,16 @@ def add_GRPCRouterServiceServicer_to_server(servicer, server):
                     servicer.GetRegisteredService,
                     request_deserializer=grpc__router_dot_stubs_dot_grpc__router__service__pb2.GetRegisteredServiceRequest.FromString,
                     response_serializer=grpc__router_dot_stubs_dot_grpc__router__service__pb2.GetRegisteredServiceResponse.SerializeToString,
+            ),
+            'ListServiceInstances': grpc.unary_unary_rpc_method_handler(
+                    servicer.ListServiceInstances,
+                    request_deserializer=grpc__router_dot_stubs_dot_grpc__router__service__pb2.ListServiceInstancesRequest.FromString,
+                    response_serializer=grpc__router_dot_stubs_dot_grpc__router__service__pb2.ListServiceInstancesResponse.SerializeToString,
+            ),
+            'WatchServices': grpc.stream_stream_rpc_method_handler(
+                    servicer.WatchServices,
+                    request_deserializer=grpc__router_dot_stubs_dot_grpc__router__service__pb2.WatchServicesRequest.FromString,
+                    response_serializer=grpc__router_dot_stubs_dot_grpc__router__service__pb2.WatchServicesResponse.SerializeToString,
             ),
             'PushHealthStatus': grpc.unary_unary_rpc_method_handler(
                     servicer.PushHealthStatus,
@@ -212,6 +270,60 @@ class GRPCRouterService(object):
             '/grpcrouter.GRPCRouterService/GetRegisteredService',
             grpc__router_dot_stubs_dot_grpc__router__service__pb2.GetRegisteredServiceRequest.SerializeToString,
             grpc__router_dot_stubs_dot_grpc__router__service__pb2.GetRegisteredServiceResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ListServiceInstances(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/grpcrouter.GRPCRouterService/ListServiceInstances',
+            grpc__router_dot_stubs_dot_grpc__router__service__pb2.ListServiceInstancesRequest.SerializeToString,
+            grpc__router_dot_stubs_dot_grpc__router__service__pb2.ListServiceInstancesResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def WatchServices(request_iterator,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.stream_stream(
+            request_iterator,
+            target,
+            '/grpcrouter.GRPCRouterService/WatchServices',
+            grpc__router_dot_stubs_dot_grpc__router__service__pb2.WatchServicesRequest.SerializeToString,
+            grpc__router_dot_stubs_dot_grpc__router__service__pb2.WatchServicesResponse.FromString,
             options,
             channel_credentials,
             insecure,

@@ -10,7 +10,6 @@ grpc-router --hostname 0.0.0.0 --port 50034
 |---|---|---|
 | `-n`, `--hostname` | `[::]` | Hostname or address to bind to (`[::]`: all interfaces). |
 | `-p`, `--port` | `50034` | Port to bind to. |
-| `-w`, `--max-workers` | `10` | Maximum number of requests handled concurrently. |
 | `-g`, `--shutdown-grace` | `5` | Seconds in-flight requests get to complete on SIGTERM/SIGINT. |
 | `-s`, `--state-file` | | JSON file to persist the register to (see below). Disabled by default. |
 | `--state-save-interval` | `1` | The state file is saved at most once per this many seconds. |
@@ -29,15 +28,41 @@ from grpc_router.core.models import ConfigOptions
 from grpc_router.server import serve
 
 serve(ConfigOptions(
-    hostname="[::]", port=50034, max_workers=10,
+    hostname="[::]", port=50034,
     allow_cross_region_connectivity=False,  # never route a client to another region
     health_check_timeout=60,
     state_file="/var/lib/grpc-router/state.json",
 ))
 ```
 
-`serve()` blocks until the router stops. `create_server()` returns a router that is not started yet, e.g. to run
-it inside another program or in tests.
+`serve()` is a coroutine that runs until the router stops (`asyncio.run(serve(config))`, as the command line
+does). To run a router inside an asyncio program, use `GRPCRouter` (`await router.start()`,
+`await router.stop(grace)`); from synchronous code or tests, `BackgroundRouter` runs it on an event loop in a
+background thread:
+
+```python
+from grpc_router.server import BackgroundRouter
+
+with BackgroundRouter(ConfigOptions(hostname="localhost", port=0)) as router:  # port 0: any free port
+    client = GRPCRouterClient("localhost", router.port)
+```
+
+## How it scales
+
+The router runs on gRPC's asyncio server: every request, and every open watch stream, is handled on one event
+loop, without a thread each. The register is in memory and its operations are short. Only the health checks and
+the state file writer use threads of their own, whatever the number of clients.
+
+Measured on an 8 core machine shared with the simulated clients: one router served **10,000 clients watching**
+(one connection and one watch stream each) with 12 threads and about 470 MB, delivered one change to all of them
+in about 1.3 s, and kept answering lookups in milliseconds. The limit is the rate of *new* connections: the
+router absorbed about 1,000 per second there, and clients that fail to connect retry with jittered backoff.
+That is why clients spread their reconnections over a few seconds when a router restarts.
+
+Each client connection uses a file descriptor of the router. `grpc-router` raises its soft limit of open files
+to the hard limit when it starts, and logs a warning if that is still below 4,096. With a typical hard limit
+of 1,024 (or with `LimitNOFILE=` unset in a systemd unit), raise it to serve more clients, e.g.
+`LimitNOFILE=65536` in the unit or `ulimit -n 65536` in the shell that starts the router.
 
 ## Regions
 
@@ -58,7 +83,9 @@ On SIGTERM or SIGINT (Ctrl+C) the router shuts down gracefully:
 1. its [gRPC health](https://grpc.io/docs/guides/health-checking/) status turns `NOT_SERVING`, so health checking
    load balancers and watchers stop sending it traffic;
 2. it rejects new requests and gives in-flight requests `--shutdown-grace` seconds to complete;
-3. it saves the state file, if any, and exits with status 0.
+3. it ends the [watch streams](discovery.md#live-updates-watch_service_instances), so that their clients
+   reconnect to the next router straight away;
+4. it saves the state file, if any, and exits with status 0.
 
 A second signal stops it immediately.
 

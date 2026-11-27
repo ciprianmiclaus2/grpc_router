@@ -1,5 +1,44 @@
 # History
 
+## 0.5.0 (unreleased)
+
+Client side discovery that keeps working when the router is down, live updates that scale to thousands of
+clients, and a router on gRPC asyncio.
+
+### Upgrading
+
+This release changes the Python API of the router and the client options (the gRPC API only gains new calls:
+0.4 clients work with a 0.5 router).
+
+* The router runs on gRPC asyncio. `serve(config)` is now a coroutine (`asyncio.run(serve(config))`), and
+  `create_server()` is replaced by `GRPCRouter` (`await start()`, `await stop(grace)`) and, for synchronous code,
+  `BackgroundRouter`.
+* `ConfigOptions.max_workers` and the `--max-workers` option are removed: requests no longer need threads.
+  `hostname` and `port` now default to `[::]` and `50034`; port `0` picks a free port (`GRPCRouter.port`).
+* `get_service()` now has a default deadline of 5 seconds (`timeout`, retries included); it used to wait for as long
+  as the retry policy did (about a minute with the default policy when the router is unreachable).
+
+### New
+
+* `ListServiceInstances` RPC and `GRPCRouterClient.get_service_instances()`: all the instances a client in a region
+  may use (the same choice as `GetRegisteredService`, as a list).
+* `WatchServices` bidirectional streaming RPC and `GRPCRouterClient.watch_service_instances()`: one stream per
+  client for all the services it watches, with the list of each straight away and on every change. On the router,
+  a stream is a coroutine, not a thread, and a change only wakes the streams subscribed to that service: one
+  router served 10,000 watching clients with 12 threads in our tests. While a client's stream is connected, its
+  lookups for the watched services are answered locally, without asking the router.
+* Clients reconnect their watch stream after a random delay of up to 10 seconds when the router shuts down (no
+  reconnection storm on a router restart), and with jittered exponential backoff after errors.
+* `ServiceChannelPool`: one gRPC channel per instance, kept up to date by a watch, round robin, with a grace period
+  before closing the channels of instances that went away.
+* Lookups fall back to the last known instances, round robin, when the router cannot be reached (`UNAVAILABLE`, or
+  no answer within the lookup `timeout`), for up to `stale_cache_max_age` (default 1 hour). `GetRegisteredService`
+  now also returns the instances list, so this costs no extra call.
+* The router ends the watch streams at the start of a shutdown, so that their clients move to the next router.
+* `GRPCRouterClient(channel_options=...)` for extra gRPC channel options, e.g. keepalive settings.
+* `grpc-router` raises its soft limit of open files to the hard limit on start (each client connection uses one),
+  and warns if it is below 4,096.
+
 ## 0.4.0 (2026-11-27)
 
 The 0.3.0 package on PyPI was broken (see below): upgrade to 0.4.0. The gRPC API (`proto/grpc_router_service.proto`)

@@ -174,12 +174,10 @@ def test_client_reports_error_then_recovers(grpc_router_server_push_health_2s, c
 ROUTER_RESTART_PORT = 7657
 
 
-def _start_router() -> grpc.Server:
+def _start_router():
     from grpc_router.core.models import ConfigOptions
-    from grpc_router.server import create_server
-    server = create_server(ConfigOptions(hostname="localhost", port=ROUTER_RESTART_PORT, max_workers=2))
-    server.start()
-    return server
+    from grpc_router.server import BackgroundRouter
+    return BackgroundRouter(ConfigOptions(hostname="localhost", port=ROUTER_RESTART_PORT)).start()
 
 
 def _wait_for(predicate, timeout: float = 5) -> bool:
@@ -196,7 +194,8 @@ def _available(client: GRPCRouterClient, service_id: str) -> bool:
         client.get_service(service_id)
         return True
     except grpc.RpcError as exc:
-        assert exc.code() == grpc.StatusCode.NOT_FOUND
+        # NOT_FOUND, or the router is not reachable (yet)
+        assert exc.code() in (grpc.StatusCode.NOT_FOUND, grpc.StatusCode.UNAVAILABLE, grpc.StatusCode.DEADLINE_EXCEEDED)
         return False
 
 
@@ -210,13 +209,14 @@ def test_client_registers_again_when_router_forgets_it(status_before_restart):
     fast_retries = copy.deepcopy(GRPCRouterClient.DEFAULT_GRPC_SERVICE_CONFIG)
     fast_retries["methodConfig"][0]["retryPolicy"].update(initialBackoff="0.1s", maxBackoff="0.2s")
     service = GRPCRouterClient("localhost", ROUTER_RESTART_PORT, grpc_service_config=fast_retries)
+    client = None
     try:
         token = service.register_service(service_id, "restart.mydomain.com", 4325, '', 10, HealthCheckType.ACTIVE_CLIENT)
         service.set_health_status(service_id, status_before_restart, "")
-        router.stop(None).wait()
+        router.stop()
         router = _start_router()
 
-        client = GRPCRouterClient("localhost", ROUTER_RESTART_PORT)
+        client = GRPCRouterClient("localhost", ROUTER_RESTART_PORT, grpc_service_config=fast_retries)
         if status_before_restart == HealthStatus.GOOD:
             assert _wait_for(lambda: _available(client, service_id))
             assert client.get_service(service_id) == ("restart.mydomain.com", 4325)
@@ -230,7 +230,9 @@ def test_client_registers_again_when_router_forgets_it(status_before_restart):
         assert service._service_register[service_id]["token"] != token
     finally:
         service.close()
-        router.stop(None).wait()
+        if client is not None:
+            client.close()
+        router.stop()
 
 
 class _NotFound(grpc.RpcError, grpc.Call):

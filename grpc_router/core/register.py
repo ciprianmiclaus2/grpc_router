@@ -38,6 +38,9 @@ class ServiceRegister:
 
     on_change, when set, is called (under the register lock) after every change worth
     persisting: anything but a heartbeat that only refreshes the last health update.
+
+    on_rotation_change, when set, is called (under the register lock, from any thread) with the
+    service_id whose in service instances changed. It must be quick and must not block.
     """
 
     GLOBAL_REGION = ''
@@ -57,6 +60,7 @@ class ServiceRegister:
         self._health_check_thread: Thread | None = None
         self._lock = RLock()
         self.on_change: Callable[[], None] | None = None
+        self.on_rotation_change: Callable[[str], None] | None = None
 
     def _changed(self) -> None:
         if self.on_change is not None:
@@ -111,6 +115,7 @@ class ServiceRegister:
                 regional_entry = []
                 entry[region] = regional_entry
             regional_entry.append(service)
+            self._rotation_changed(service_id)
             if region != self.GLOBAL_REGION:
                 self._non_global_services[service_id].append(service)
             if service.health_check_type == HealthCheckType.NONE:
@@ -194,6 +199,8 @@ class ServiceRegister:
             if idx is not None:
                 svc = entry.pop(idx)
             self._health_register.pop(service_token, None)
+            if svc is not None:
+                self._rotation_changed(service_id)
             return svc
 
     def _take_out_of_service(self, info: HealthRegisterInfo) -> None:
@@ -228,25 +235,46 @@ class ServiceRegister:
             if info is not None and info.service.service_id == service_id:
                 self._take_out_of_service(info)
 
+    def _rotation_changed(self, service_id: str) -> None:
+        if self.on_rotation_change is not None:
+            self.on_rotation_change(service_id)
+
+    def _eligible_instances(self, service_id: str, region: str) -> tuple[str | None, list[Service]]:
+        """The in service instances a client in region may use, and the round robin key of that group:
+        its region's, else the global region's (if allowed), else all the regions' (if allowed)."""
+        regional_entry = self._register.get(service_id)
+        if not regional_entry:
+            return region, []
+        entry = regional_entry.get(region)
+        if entry:
+            return region, entry
+        if region != self.GLOBAL_REGION and self._config.allow_global_region:
+            entry = regional_entry.get(self.GLOBAL_REGION)
+            if entry:
+                return self.GLOBAL_REGION, entry
+        if self._config.allow_cross_region_connectivity:
+            return None, self._non_global_services[service_id]
+        return region, []
+
     def get_service(self, service_id: str, region: str) -> Service | None:
+        """The next instance, round robin, among the ones a client in region may use."""
+        return self.pick_service(service_id, region)[0]
+
+    def pick_service(self, service_id: str, region: str) -> tuple[Service | None, list[Service]]:
+        """get_service() and get_service_instances(), consistently with each other."""
         with self._lock:
-            regional_entry = self._register.get(service_id)
-            if regional_entry:
-                region_key = region
-                entry = regional_entry.get(region)
-                if not entry and region != self.GLOBAL_REGION and self._config.allow_global_region:
-                    # lookup in the global region
-                    entry = regional_entry.get(self.GLOBAL_REGION)
-                    region_key = self.GLOBAL_REGION
-                if not entry and self._config.allow_cross_region_connectivity:
-                    entry = self._non_global_services[service_id]
-                    region_key = None
-                if entry:
-                    entry_key = (service_id, region_key)
-                    counter = self._service_counters.get(entry_key, 0)
-                    self._service_counters[entry_key] = counter + 1
-                    return entry[counter % len(entry)]
-        return None
+            region_key, entry = self._eligible_instances(service_id, region)
+            if not entry:
+                return None, []
+            entry_key = (service_id, region_key)
+            counter = self._service_counters.get(entry_key, 0)
+            self._service_counters[entry_key] = counter + 1
+            return entry[counter % len(entry)], list(entry)
+
+    def get_service_instances(self, service_id: str, region: str) -> list[Service]:
+        """All the instances a client in region may use (the ones get_service picks from)."""
+        with self._lock:
+            return list(self._eligible_instances(service_id, region)[1])
 
     def push_health_status(
         self, service_id: str, service_token: str, health_status: HealthStatus, description: str

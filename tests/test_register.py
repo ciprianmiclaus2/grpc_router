@@ -32,7 +32,7 @@ def clock(monkeypatch) -> FakeClock:
 @pytest.fixture
 def register(clock) -> ServiceRegister:
     return ServiceRegister(ConfigOptions(
-        hostname="localhost", port=0, max_workers=1,
+        hostname="localhost", port=0,
         health_check_timeout=HEALTH_CHECK_TIMEOUT, unhealthy_expiry_timeout=EXPIRY_TIMEOUT,
     ))
 

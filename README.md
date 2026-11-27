@@ -38,10 +38,10 @@ Requires Python 3.11 or newer.
 
 ## Usage
 
-Start the router (defaults: bind to `[::]:50034` with 10 workers):
+Start the router (defaults: bind to `[::]:50034`):
 
 ```
-grpc-router --hostname 0.0.0.0 --port 50034 --max-workers 10 --shutdown-grace 5
+grpc-router --hostname 0.0.0.0 --port 50034 --shutdown-grace 5
 ```
 
 On SIGTERM or SIGINT (Ctrl+C) the router shuts down gracefully: its health status turns `NOT_SERVING`,
@@ -68,7 +68,17 @@ router = GRPCRouterClient("router.mydomain.com", 50034)
 host, port = router.get_service("myorg.billing.invoices", region="us-east")
 ```
 
-Instances of the same service are returned round robin, preferring the client's own region.
+Instances of the same service are returned round robin, preferring the client's own region. If the router
+cannot be reached, lookups answer from the instances they last saw. To follow the instances of a service live,
+or to get a channel per instance:
+
+```python
+watch = router.watch_service_instances("myorg.billing.invoices", region="us-east")  # lookups now local
+
+from grpc_router.client.discovery import ServiceChannelPool
+with ServiceChannelPool(router, "myorg.billing.invoices", region="us-east") as pool:
+    channel = pool.next_channel()  # round robin over the instances
+```
 
 With `HealthCheckType.ACTIVE_CLIENT` the client sends heartbeats to the router. A service that misses
 heartbeats, or reports an error with `set_health_status(service_id, HEALTH_STATUS_ERROR, "why")`, is taken

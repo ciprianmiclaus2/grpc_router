@@ -3,9 +3,10 @@
 #
 # Note: the generated *_pb2.py / *_pb2_grpc.py files embed the protobuf and grpcio
 # versions of the grpcio-tools used here, and refuse to load on older runtimes.
-# After regenerating, bump the protobuf/grpcio lower bounds in pyproject.toml to
-# match (see "Protobuf Python Version" in the _pb2.py header and
-# GRPC_GENERATED_VERSION in the _pb2_grpc.py file).
+# To keep the current lower bounds (protobuf>=5.27.2, grpcio>=1.66.2), run this with
+# grpcio-tools==1.66.2 (e.g. in a Python 3.12 venv). With a newer grpcio-tools, bump
+# the protobuf/grpcio lower bounds in pyproject.toml to match (see "Protobuf Python
+# Version" in the _pb2.py header and GRPC_GENERATED_VERSION in the _pb2_grpc.py file).
 set -euo pipefail
 cd "$(dirname "$0")"
 python -m grpc_tools.protoc -Igrpc_router/stubs=./proto/ \
