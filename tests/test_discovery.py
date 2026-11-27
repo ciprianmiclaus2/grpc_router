@@ -12,6 +12,7 @@ from unittest import mock
 import grpc
 import pytest
 
+import grpc_router
 from grpc_router.client.client import GRPCRouterClient
 from grpc_router.client.discovery import ServiceChannelPool, WatchStream
 from grpc_router.core.models import ConfigOptions, HealthCheckType, HealthStatus
@@ -221,6 +222,16 @@ def _open_files_hard_limit() -> int | None:
     return None if hard == resource.RLIM_INFINITY else hard
 
 
+def _readline(proc: subprocess.Popen, timeout: float) -> str:
+    """The next line of proc's stdout, failing the test instead of hanging if it does not come."""
+    lines: queue.SimpleQueue = queue.SimpleQueue()
+    threading.Thread(target=lambda: lines.put(proc.stdout.readline()), daemon=True).start()
+    try:
+        return lines.get(timeout=timeout)
+    except queue.Empty:
+        pytest.fail(f"no output from the helper within {timeout}s")
+
+
 def test_many_watching_clients():
     # Each watch is a coroutine on the router, not a thread. The router and the simulated clients
     # (one connection and one watch stream each) run in their own processes, as in production.
@@ -229,9 +240,12 @@ def test_many_watching_clients():
     if clients < 200:
         pytest.skip(f"the limit of open files ({hard_limit}) is too low for this test")
 
+    # the subprocesses run the grpc_router these tests import (the source tree, an installed wheel, ...)
+    env = {**os.environ, "PYTHONPATH": os.pathsep.join(
+        filter(None, [str(Path(grpc_router.__file__).parent.parent), os.environ.get("PYTHONPATH")]))}
     router = subprocess.Popen(  # raises its own limit of open files on start
         [sys.executable, "-m", "grpc_router.server", "-n", "localhost", "-p", str(SCALE_ROUTER_PORT)],
-        stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+        stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, env=env,
     )
     helper = None
     try:
@@ -240,14 +254,14 @@ def test_many_watching_clients():
         threads_idle = _thread_count(router.pid)
         helper = subprocess.Popen(
             [sys.executable, str(Path(__file__).with_name("watch_clients.py")), str(SCALE_ROUTER_PORT), str(clients), "4"],
-            stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True,
+            stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True, env=env,
         )
         assert helper.stdout is not None and helper.stdin is not None
-        assert helper.stdout.readline().strip() == "ready"
+        assert _readline(helper, timeout=60).strip() == "ready"
         threads_watched = _thread_count(router.pid)
         helper.stdin.write("go\n")
         helper.stdin.flush()
-        result = json.loads(helper.stdout.readline())
+        result = json.loads(_readline(helper, timeout=60))
         assert helper.wait(timeout=30) == 0
 
         assert result["opened"] == result["seen"] == clients, result

@@ -1,6 +1,6 @@
 # History
 
-## 0.5.0 (unreleased)
+## 0.5.0 (2026-11-27)
 
 Client side discovery that keeps working when the router is down, live updates that scale to thousands of
 clients, and a router on gRPC asyncio.

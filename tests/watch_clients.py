@@ -5,11 +5,13 @@ poller with the routers the other tests run in background event loops, and so th
 count against its own limit of open files.
 
 Usage: python watch_clients.py PORT CLIENTS RAMP_SECONDS. Prints "ready", waits for a line on stdin,
-registers an instance, then prints a JSON line with the results.
+registers an instance, then prints a JSON line with the results. Use a router of its own: the instance
+must be new to the router, or the watchers get no update.
 """
 
 import asyncio
 import json
+import os
 import sys
 import time
 
@@ -27,7 +29,7 @@ from grpc_router.stubs.grpc_router_service_pb2_grpc import GRPCRouterServiceStub
 SERVICE_ID = "many.watchers.service"
 
 
-async def main(port: int, clients: int, ramp_seconds: float) -> dict:
+async def main(port: int, clients: int, ramp_seconds: float) -> None:
     subscribe = WatchServicesRequest(subscribe=[ServiceSubscription(service_id=SERVICE_ID)])
 
     async def open_watch(delay: float):
@@ -49,12 +51,15 @@ async def main(port: int, clients: int, ramp_seconds: float) -> dict:
         updates = await asyncio.gather(*(asyncio.wait_for(call.read(), 30) for _, call in watches))
         fan_out = time.monotonic() - started
     seen = sum(1 for u in updates if [i.endpoint.host for i in u.updates[0].instances] == ["a"])
+    print(json.dumps({"opened": len(watches), "seen": seen, "fan_out": fan_out}), flush=True)
     for _, call in watches:
         call.cancel()
     await asyncio.gather(*(channel.close() for channel, _ in watches))
-    return {"opened": len(watches), "seen": seen, "fan_out": fan_out}
+    # With grpcio 1.66 (our minimum), asyncio.run() never returns after a process closed about a
+    # thousand asyncio channels: exit without the event loop teardown, the work is done.
+    os._exit(0)
 
 
 if __name__ == "__main__":
     raise_open_files_limit()
-    print(json.dumps(asyncio.run(main(int(sys.argv[1]), int(sys.argv[2]), float(sys.argv[3])))), flush=True)
+    asyncio.run(main(int(sys.argv[1]), int(sys.argv[2]), float(sys.argv[3])))
