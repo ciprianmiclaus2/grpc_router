@@ -41,7 +41,7 @@ grpc-router = "grpc_router.server:main"
 
 [project.urls]
 homepage = "https://github.com/ciprianmiclaus2/grpc_router"
-documentation = "https://ciprianmiclaus2.github.io/grpc_router/"
+documentation = "https://github.com/ciprianmiclaus2/grpc_router#readme"
 repository = "https://github.com/ciprianmiclaus2/grpc_router"
 history = "https://github.com/ciprianmiclaus2/grpc_router/blob/main/HISTORY.md"
 

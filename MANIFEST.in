@@ -1,0 +1,4 @@
+# Extra files for the source distribution (the wheel only ships the grpc_router package).
+include HISTORY.md CONTRIBUTING.md gen_stubs.sh
+recursive-include proto *.proto
+recursive-include tests *.py

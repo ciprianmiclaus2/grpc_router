@@ -82,3 +82,11 @@ jobs:
         cp -r tests "$RUNNER_TEMP/"
         cd "$RUNNER_TEMP"
         "$RUNNER_TEMP/venv/bin/python" -I -m pytest tests
+    - name: Test the sdist (build from it and run its own tests)
+      run: |
+        mkdir "$RUNNER_TEMP/sdist"
+        tar xzf dist/*.tar.gz -C "$RUNNER_TEMP/sdist"
+        cd "$RUNNER_TEMP"/sdist/grpc_router-*/
+        python -m venv "$RUNNER_TEMP/sdist-venv"
+        "$RUNNER_TEMP/sdist-venv/bin/pip" install . --group test
+        "$RUNNER_TEMP/sdist-venv/bin/python" -m pytest
