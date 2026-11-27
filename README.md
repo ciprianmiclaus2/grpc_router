@@ -41,8 +41,12 @@ Requires Python 3.11 or newer.
 Start the router (defaults: bind to `[::]:50034` with 10 workers):
 
 ```
-grpc-router --hostname 0.0.0.0 --port 50034 --max-workers 10
+grpc-router --hostname 0.0.0.0 --port 50034 --max-workers 10 --shutdown-grace 5
 ```
+
+On SIGTERM or SIGINT (Ctrl+C) the router shuts down gracefully: its health status turns `NOT_SERVING`,
+new requests are rejected and in-flight requests get `--shutdown-grace` seconds to complete.
+A second signal stops it immediately.
 
 A service registers itself and a client looks it up:
 
@@ -65,4 +69,5 @@ host, port = router.get_service("myorg.billing.invoices", region="us-east")
 ```
 
 Instances of the same service are returned round robin, preferring the client's own region.
-The router also exposes the standard gRPC health checking and reflection services.
+The router also exposes the standard gRPC health checking service, and server reflection (both v1 and v1alpha)
+so tools like `grpcurl` can list and describe its API.

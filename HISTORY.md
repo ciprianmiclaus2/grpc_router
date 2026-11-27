@@ -9,6 +9,11 @@
 * Declare the minimum dependency versions required by the generated code: `grpcio>=1.66.2`,
   `grpcio-reflection>=1.66.2`, `grpcio-health-checking>=1.66.2`, `protobuf>=5.27.2` (tested up to protobuf 7).
 * New `grpc-router` command line entry point to start the server.
+* Graceful shutdown on SIGTERM/SIGINT: the health status turns NOT_SERVING, new RPCs are rejected and in-flight
+  RPCs get a grace period (`--shutdown-grace`, `ConfigOptions.shutdown_grace`, default 5s) to complete; a second
+  signal stops immediately. The server now logs startup and shutdown.
+* Server reflection is now served as both `grpc.reflection.v1` and `grpc.reflection.v1alpha`, so clients that only
+  speak v1 (recent grpcurl, Postman, etc.) work.
 * The server no longer enables `SO_REUSEPORT`: starting a second router on a port already in use now fails
   instead of silently splitting the service register between the two processes.
 * New `grpc_router.server.create_server(config)` to build a server without blocking (`serve` still blocks).

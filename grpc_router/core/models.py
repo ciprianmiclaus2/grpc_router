@@ -26,6 +26,8 @@ class ConfigOptions:
 
     health_check_timeout: int = 300  # in seconds
 
+    shutdown_grace: float = 5.0  # in seconds, for in-flight requests on SIGTERM/SIGINT
+
 
 @dataclass
 class Service:

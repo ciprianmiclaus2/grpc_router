@@ -1,9 +1,13 @@
 import argparse
+import logging
+import signal
+import threading
 from concurrent.futures import ThreadPoolExecutor
+from types import FrameType
 
 import grpc
 from grpc_health.v1 import health, health_pb2, health_pb2_grpc
-from grpc_reflection.v1alpha import reflection
+from grpc_reflection.v1alpha import reflection, reflection_pb2, reflection_pb2_grpc
 
 from grpc_router.core.models import ConfigOptions, HealthCheckType, HealthStatus
 from grpc_router.core.register import ServiceRegister
@@ -22,6 +26,13 @@ from grpc_router.stubs.grpc_router_service_pb2 import (
 from grpc_router.stubs.grpc_router_service_pb2_grpc import GRPCRouterServiceServicer, add_GRPCRouterServiceServicer_to_server
 
 SERVICE_NAME = DESCRIPTOR.services_by_name["GRPCRouterService"].full_name
+
+# grpcio-reflection only ships the v1alpha reflection service. The v1 protocol is a copy
+# of it under a new package name (identical messages on the wire), so the v1alpha
+# servicer also serves v1 clients, e.g. recent grpcurl/Postman versions.
+REFLECTION_V1_SERVICE_NAME = "grpc.reflection.v1.ServerReflection"
+
+logger = logging.getLogger(__name__)
 
 
 def to_health_check_type(health_check_type: int) -> HealthCheckType:
@@ -168,20 +179,35 @@ class GRPCRouterServer(GRPCRouterServiceServicer):
 
 
 def enable_reflection_service(server: grpc.Server) -> None:
-    reflection.enable_server_reflection((SERVICE_NAME, reflection.SERVICE_NAME), server)
+    """Serve gRPC server reflection, both the v1 and the v1alpha versions."""
+    servicer = reflection.ReflectionServicer(
+        (SERVICE_NAME, REFLECTION_V1_SERVICE_NAME, reflection.SERVICE_NAME)
+    )
+    # v1alpha
+    reflection_pb2_grpc.add_ServerReflectionServicer_to_server(servicer, server)
+    # v1: the same servicer and (wire compatible) messages, on the v1 method path
+    server.add_generic_rpc_handlers((
+        grpc.method_handlers_generic_handler(REFLECTION_V1_SERVICE_NAME, {
+            "ServerReflectionInfo": grpc.stream_stream_rpc_method_handler(
+                servicer.ServerReflectionInfo,
+                request_deserializer=reflection_pb2.ServerReflectionRequest.FromString,
+                response_serializer=reflection_pb2.ServerReflectionResponse.SerializeToString,
+            ),
+        }),
+    ))
 
 
-def enable_health_service(server: grpc.Server) -> None:
+def enable_health_service(server: grpc.Server) -> health.HealthServicer:
     health_servicer = health.HealthServicer(
         experimental_non_blocking=True,
         experimental_thread_pool=ThreadPoolExecutor(max_workers=5),
     )
     health_pb2_grpc.add_HealthServicer_to_server(health_servicer, server)
     health_servicer.set(SERVICE_NAME, health_pb2.HealthCheckResponse.SERVING)
+    return health_servicer
 
 
-def create_server(config: ConfigOptions) -> grpc.Server:
-    """Create a (not yet started) grpc router server bound to config.hostname:config.port."""
+def _build_server(config: ConfigOptions) -> tuple[grpc.Server, health.HealthServicer]:
     server = grpc.server(
         ThreadPoolExecutor(max_workers=config.max_workers),
         # The router holds the service register in memory, so two routers sharing a
@@ -190,15 +216,52 @@ def create_server(config: ConfigOptions) -> grpc.Server:
     )
     add_GRPCRouterServiceServicer_to_server(GRPCRouterServer(config), server)
     enable_reflection_service(server)
-    enable_health_service(server)
+    health_servicer = enable_health_service(server)
     server.add_insecure_port(f"{config.hostname}:{config.port}")
+    return server, health_servicer
+
+
+def create_server(config: ConfigOptions) -> grpc.Server:
+    """Create a (not yet started) grpc router server bound to config.hostname:config.port."""
+    server, _ = _build_server(config)
     return server
 
 
 def serve(config: ConfigOptions) -> None:
-    server = create_server(config)
+    """Run the grpc router until it is stopped.
+
+    When called from the main thread, SIGTERM and SIGINT trigger a graceful shutdown:
+    the health status turns NOT_SERVING, new RPCs are rejected and in-flight RPCs get
+    config.shutdown_grace seconds to complete. A second signal stops immediately.
+    """
+    server, health_servicer = _build_server(config)
     server.start()
-    server.wait_for_termination()
+    logger.info("grpc router listening on %s:%s", config.hostname, config.port)
+
+    stopping = False
+
+    def _shutdown(signum: int, frame: FrameType | None) -> None:
+        nonlocal stopping
+        name = signal.Signals(signum).name
+        if stopping:
+            logger.info("Received %s again, stopping immediately", name)
+            server.stop(None)
+            return
+        stopping = True
+        logger.info("Received %s, shutting down (grace period %ss)", name, config.shutdown_grace)
+        health_servicer.enter_graceful_shutdown()
+        server.stop(config.shutdown_grace)
+
+    previous_handlers = {}
+    if threading.current_thread() is threading.main_thread():
+        for sig in (signal.SIGTERM, signal.SIGINT):
+            previous_handlers[sig] = signal.signal(sig, _shutdown)
+    try:
+        server.wait_for_termination()
+    finally:
+        for sig, handler in previous_handlers.items():
+            signal.signal(sig, handler)
+    logger.info("grpc router stopped")
 
 
 def main() -> None:
@@ -210,12 +273,17 @@ def main() -> None:
     parser.add_argument('-w', '--max-workers', dest='max_workers',
                         type=int, default=10,
                         help='Maximum concurrent workers to handle requests.')
+    parser.add_argument('-g', '--shutdown-grace', dest='shutdown_grace',
+                        type=float, default=5.0,
+                        help='Seconds to let in-flight requests complete on SIGTERM/SIGINT.')
 
     args = parser.parse_args()
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     config = ConfigOptions(
         hostname=args.hostname,
         port=args.port,
         max_workers=args.max_workers,
+        shutdown_grace=args.shutdown_grace,
     )
     serve(config)
 
