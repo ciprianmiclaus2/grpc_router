@@ -1,7 +1,7 @@
 import grpc
+import pytest
 
 from grpc_router.client.client import GRPCRouterClient
-import pytest
 
 
 def test_connectivity(grpc_router_server):
@@ -80,3 +80,11 @@ def test_multiple_services_round_robin(grpc_router_server):
     client3.deregister_service(
         service_id=service_id
     )
+
+
+def test_client_context_manager(grpc_router_server):
+    with GRPCRouterClient("localhost", 7654) as client:
+        client.register_service("ctx.manager.service", "ctxhost", 5555)
+        assert client.get_service("ctx.manager.service") == ("ctxhost", 5555)
+        client.deregister_service("ctx.manager.service")
+    assert client._channel is None

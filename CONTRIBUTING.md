@@ -14,7 +14,7 @@ Report bugs at https://github.com/ciprianmiclaus2/grpc_router/issues.
 If you are reporting a bug, please include:
 
 * Your operating system name and version.
-* Python version, pandas version
+* Python version, grpcio and protobuf versions
 * Any other details about your local setup that might be helpful in troubleshooting.
 * Detailed steps to reproduce the bug (a test case is ideal).
 
@@ -30,8 +30,8 @@ and "help wanted" is open to whoever wants to implement it.
 
 ### Write Documentation
 
-ETLrules could always use more documentation, whether as part of the
-official ETLrules docs, in docstrings, or even on the web in blog posts,
+grpc_router could always use more documentation, whether as part of the
+official grpc_router docs, in docstrings, or even on the web in blog posts,
 articles, and such.
 
 ### Submit Feedback
@@ -62,10 +62,10 @@ Ready to contribute? Here's how to set up `grpc_router` for local development.
     python -m venv path_to_your_env
 ```
 
-4. Install the dependencies
-In the project root folder run:
+4. Install the package in editable mode with the development dependencies
+(needs pip >= 25.1 for `--group`). In the project root folder run:
 ```
-    pip install .[dev,test]
+    pip install -e . --group dev
 ```
 
 5. Create a branch for local development:
@@ -77,10 +77,11 @@ In the project root folder run:
    Now you can make your changes locally.
 
 6. When you're done making changes, check that your changes pass the
-   tests, including testing other Python versions, with tox:
+   linter and the tests:
 
 ```
-    $ tox
+    $ ruff check .
+    $ pytest
 ```
 
 7. Commit your changes and push your branch to GitHub:
@@ -101,24 +102,40 @@ Before you submit a pull request, check that it meets these guidelines:
 2. If the pull request adds functionality, the docs should be updated. Put
    your new functionality into a function with a docstring, and add the
    feature to the list in README.md.
-3. The pull request should work for Python>3.9 and for PyPy. Check
+3. The pull request should work for Python 3.11 and newer. Check
    https://github.com/ciprianmiclaus2/grpc_router/actions
    and make sure that the tests pass for all supported Python versions.
 
-## Tips```
+## Tips
+
+To run the tests:
+
+```
     $ pytest -vv tests/
-```To run a the tests.
+```
+
+If you change `proto/grpc_router_service.proto`, regenerate the stubs with:
+
+```
+    $ ./gen_stubs.sh
+```
+
+Regenerating embeds the protobuf/grpcio versions of your grpcio-tools in the
+generated code, so bump the lower bounds in pyproject.toml to match (see the
+comments in gen_stubs.sh).
 
 
 ## Deploying
 
 A reminder for the maintainers on how to deploy.
-Make sure all your changes are committed (including an entry in HISTORY.md).
-Then run:
+Make sure all your changes are committed (including an entry in HISTORY.md
+and the version bump in pyproject.toml). Then tag and push:
 
 ```
+$ git tag v<version>
 $ git push
 $ git push --tags
 ```
 
-Github Actions will then deploy to PyPI if tests pass.
+Then publish a GitHub release for the tag; GitHub Actions builds the package
+and uploads it to PyPI (trusted publishing).

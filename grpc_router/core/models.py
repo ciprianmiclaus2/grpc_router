@@ -1,7 +1,5 @@
 from dataclasses import dataclass
-import datetime
 from enum import IntEnum
-from typing import Optional
 
 
 class HealthCheckType(IntEnum):
@@ -23,10 +21,10 @@ class ConfigOptions:
     port: int
     max_workers: int
 
-    allow_global_region: bool=True
-    allow_cross_region_connectivity: bool=True
+    allow_global_region: bool = True
+    allow_cross_region_connectivity: bool = True
 
-    health_check_timeout: int=300  # in seconds
+    health_check_timeout: int = 300  # in seconds
 
 
 @dataclass

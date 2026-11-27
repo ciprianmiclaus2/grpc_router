@@ -1,7 +1,10 @@
 import sys
 from unittest import mock
 
-from grpc_router.server import main
+import pytest
+
+from grpc_router.core.models import ConfigOptions
+from grpc_router.server import create_server, main
 
 
 @mock.patch('grpc_router.server.serve')
@@ -16,3 +19,10 @@ def test_server_entrypoint(serve_mock):
     assert config_options.max_workers == 10
     assert config_options.allow_global_region is True
     assert config_options.allow_cross_region_connectivity is True
+
+
+def test_server_refuses_shared_port(grpc_router_server):
+    # a second router must not silently share the port (and split the register) with the first one
+    config = ConfigOptions(hostname="localhost", port=7654, max_workers=1)
+    with pytest.raises(RuntimeError):
+        create_server(config)

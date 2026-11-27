@@ -1,6 +1,6 @@
+from grpc_health.v1 import health_pb2, health_pb2_grpc
+
 from grpc_router.client.client import GRPCRouterClient
-from grpc_health.v1 import health_pb2
-from grpc_health.v1 import health_pb2_grpc
 
 
 def test_health_check(grpc_router_server):

@@ -2,6 +2,7 @@ import grpc
 import pytest
 
 from grpc_router.client.client import GRPCRouterClient
+from grpc_router.stubs.grpc_router_service_pb2 import HEALTH_STATUS_GOOD, HealthInfoRequest
 
 
 @pytest.mark.parametrize("service_id,host,port,region,expected_err_code,expected_err_str", [
@@ -64,6 +65,21 @@ def test_get_registered_service_validation_errors(service_id, expected_err_code,
     with pytest.raises(grpc.RpcError) as exc:
         client.get_service(
             service_id=service_id
+        )
+    assert exc.value.code() == expected_err_code
+    assert exc.value.details() == expected_err_str
+
+
+@pytest.mark.parametrize("service_id,service_token,expected_err_code,expected_err_str", [
+    ["", "token", grpc.StatusCode.INVALID_ARGUMENT, "The service_id cannot be empty."],
+    ["svc", "", grpc.StatusCode.INVALID_ARGUMENT, "The service_token cannot be empty."],
+    ["svc", "unknown-token", grpc.StatusCode.NOT_FOUND, "The service could not be found."],
+])
+def test_push_health_status_errors(service_id, service_token, expected_err_code, expected_err_str, grpc_router_server):
+    client = GRPCRouterClient("localhost", 7654)
+    with pytest.raises(grpc.RpcError) as exc:
+        client.stub.PushHealthStatus(
+            HealthInfoRequest(service_id=service_id, service_token=service_token, status=HEALTH_STATUS_GOOD)
         )
     assert exc.value.code() == expected_err_code
     assert exc.value.details() == expected_err_str

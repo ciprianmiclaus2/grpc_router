@@ -1,27 +1,27 @@
 import argparse
 from concurrent.futures import ThreadPoolExecutor
-import grpc
-from grpc_health.v1 import health
-from grpc_health.v1 import health_pb2
-from grpc_health.v1 import health_pb2_grpc
-from grpc_reflection.v1alpha import reflection
 
-from grpc_router.stubs.grpc_router_service_pb2_grpc import add_GRPCRouterServiceServicer_to_server, GRPCRouterServiceServicer
-from grpc_router.stubs.grpc_router_service_pb2 import (
-    HEALTH_CHECK_ACTIVE_CLIENT,
-    HEALTH_CHECK_PASSIVE_CLIENT,
-    HEALTH_STATUS_GOOD,
-    HEALTH_STATUS_WARNING,
-    HEALTH_STATUS_ERROR,
-    HealthInfoResponse,
-    ServiceRegistrationResponse,
-    ServiceDeregistrationResponse,
-    GetRegisteredServiceResponse,
-    DESCRIPTOR,
-)
+import grpc
+from grpc_health.v1 import health, health_pb2, health_pb2_grpc
+from grpc_reflection.v1alpha import reflection
 
 from grpc_router.core.models import ConfigOptions, HealthCheckType, HealthStatus
 from grpc_router.core.register import ServiceRegister
+from grpc_router.stubs.grpc_router_service_pb2 import (
+    DESCRIPTOR,
+    HEALTH_CHECK_ACTIVE_CLIENT,
+    HEALTH_CHECK_PASSIVE_CLIENT,
+    HEALTH_STATUS_ERROR,
+    HEALTH_STATUS_GOOD,
+    HEALTH_STATUS_WARNING,
+    GetRegisteredServiceResponse,
+    HealthInfoResponse,
+    ServiceDeregistrationResponse,
+    ServiceRegistrationResponse,
+)
+from grpc_router.stubs.grpc_router_service_pb2_grpc import GRPCRouterServiceServicer, add_GRPCRouterServiceServicer_to_server
+
+SERVICE_NAME = DESCRIPTOR.services_by_name["GRPCRouterService"].full_name
 
 
 def to_health_check_type(health_check_type: int) -> HealthCheckType:
@@ -44,11 +44,11 @@ def to_health_status(health_status: int) -> HealthStatus:
 
 class GRPCRouterServer(GRPCRouterServiceServicer):
 
-    def __init__(self, config: ConfigOptions):
+    def __init__(self, config: ConfigOptions) -> None:
         self._config = config
         self._register = ServiceRegister(config)
 
-    def _validate_RegisterService(self, request, context):
+    def _validate_RegisterService(self, request, context) -> None:
         service_id = request.service_id
         if not service_id:
             context.abort(
@@ -77,7 +77,7 @@ class GRPCRouterServer(GRPCRouterServiceServicer):
 
     def RegisterService(self, request, context) -> ServiceRegistrationResponse:
         self._validate_RegisterService(request, context)
-        service_token, error = self._register.register_service(
+        service_token, _error = self._register.register_service(
             service_id=request.service_id,
             host=request.endpoint.host,
             port=request.endpoint.port,
@@ -148,7 +148,7 @@ class GRPCRouterServer(GRPCRouterServiceServicer):
         if not service_token:
             context.abort(
                 grpc.StatusCode.INVALID_ARGUMENT,
-                "The service_context cannot be empty."
+                "The service_token cannot be empty."
             )
 
     def PushHealthStatus(self, request, context) -> HealthInfoResponse:
@@ -168,11 +168,7 @@ class GRPCRouterServer(GRPCRouterServiceServicer):
 
 
 def enable_reflection_service(server: grpc.Server) -> None:
-    SERVICE_NAMES = (
-        DESCRIPTOR.services_by_name["GRPCRouterService"].full_name,
-        reflection.SERVICE_NAME,
-    )
-    reflection.enable_server_reflection(SERVICE_NAMES, server)
+    reflection.enable_server_reflection((SERVICE_NAME, reflection.SERVICE_NAME), server)
 
 
 def enable_health_service(server: grpc.Server) -> None:
@@ -181,23 +177,31 @@ def enable_health_service(server: grpc.Server) -> None:
         experimental_thread_pool=ThreadPoolExecutor(max_workers=5),
     )
     health_pb2_grpc.add_HealthServicer_to_server(health_servicer, server)
-    health_servicer.set(
-        DESCRIPTOR.services_by_name["GRPCRouterService"].full_name,
-        health_pb2.HealthCheckResponse.SERVING
+    health_servicer.set(SERVICE_NAME, health_pb2.HealthCheckResponse.SERVING)
+
+
+def create_server(config: ConfigOptions) -> grpc.Server:
+    """Create a (not yet started) grpc router server bound to config.hostname:config.port."""
+    server = grpc.server(
+        ThreadPoolExecutor(max_workers=config.max_workers),
+        # The router holds the service register in memory, so two routers sharing a
+        # port (grpc enables SO_REUSEPORT by default on Linux) would split it.
+        options=[("grpc.so_reuseport", 0)],
     )
-
-
-def serve(config: ConfigOptions) -> None:
-    server = grpc.server(ThreadPoolExecutor(max_workers=config.max_workers))
     add_GRPCRouterServiceServicer_to_server(GRPCRouterServer(config), server)
     enable_reflection_service(server)
     enable_health_service(server)
     server.add_insecure_port(f"{config.hostname}:{config.port}")
+    return server
+
+
+def serve(config: ConfigOptions) -> None:
+    server = create_server(config)
     server.start()
     server.wait_for_termination()
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument('-n', '--hostname', dest='hostname', default='[::]',
                         help='Hostname to bind the service to')

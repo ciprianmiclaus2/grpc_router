@@ -1,6 +1,3 @@
-# This workflow will install Python dependencies, run tests and lint with a variety of Python versions
-# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-python
-
 name: Python package
 
 on:
@@ -9,36 +6,79 @@ on:
   pull_request:
     branches: [ "main" ]
 
-jobs:
-  build:
+permissions:
+  contents: read
 
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v6
+    - uses: actions/setup-python@v6
+      with:
+        python-version: "3.14"
+    - name: Lint with ruff
+      run: |
+        python -m pip install --upgrade pip ruff
+        ruff check --output-format=github .
+
+  test:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.9", "3.10", "3.11", "3.12", "3.13"]
-
+        python-version: ["3.11", "3.12", "3.13", "3.14", "3.15"]
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v6
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v3
+      uses: actions/setup-python@v6
       with:
         python-version: ${{ matrix.python-version }}
+        allow-prereleases: true
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        python -m pip install flake8 pytest pytest-cov
-        python -m pip install .[test]
-    - name: Lint with flake8
-      run: |
-        # stop the build if there are Python syntax errors or undefined names
-        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-        # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
-        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+        python -m pip install -e . --group test
     - name: Test with pytest
-      run: |
-        pytest --cov=grpc_router --cov-report=xml --cov-report term-missing tests/
+      run: pytest --cov --cov-report=xml --cov-report=term-missing
     - name: Upload coverage reports to Codecov
-      uses: codecov/codecov-action@v3
-      env:
-        CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+      uses: codecov/codecov-action@v5
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+
+  # Oldest supported Python with the minimum dependency versions from pyproject.toml.
+  minimum-versions:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v6
+    - uses: actions/setup-python@v6
+      with:
+        python-version: "3.11"
+    - name: Install minimum dependencies
+      run: |
+        python -m pip install --upgrade pip
+        python -m pip install -e . --group test \
+          grpcio==1.66.2 grpcio-reflection==1.66.2 grpcio-health-checking==1.66.2 protobuf==5.27.2
+    - name: Test with pytest
+      run: pytest
+
+  # Build the sdist/wheel and run the tests against the *installed* wheel (outside the
+  # source tree) so that packaging mistakes, e.g. missing subpackages, are caught.
+  package:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v6
+    - uses: actions/setup-python@v6
+      with:
+        python-version: "3.14"
+    - name: Build
+      run: |
+        python -m pip install --upgrade pip build
+        python -m build
+    - name: Test the installed wheel
+      run: |
+        python -m venv "$RUNNER_TEMP/venv"
+        "$RUNNER_TEMP/venv/bin/pip" install dist/*.whl --group test
+        cp -r tests "$RUNNER_TEMP/"
+        cd "$RUNNER_TEMP"
+        "$RUNNER_TEMP/venv/bin/python" -I -m pytest tests

@@ -1,5 +1,26 @@
 # History
 
+## 0.4.0 (unreleased)
+
+* Fix the published package: the 0.3.0 wheel only contained `grpc_router/server.py` and was missing the
+  `client`, `core` and `stubs` subpackages, so it could not be imported. CI now builds the wheel and runs the
+  test suite against the installed wheel.
+* Python 3.11+ is now required (3.9 and 3.10 are end of life). Python 3.14 and 3.15 are supported.
+* Declare the minimum dependency versions required by the generated code: `grpcio>=1.66.2`,
+  `grpcio-reflection>=1.66.2`, `grpcio-health-checking>=1.66.2`, `protobuf>=5.27.2` (tested up to protobuf 7).
+* New `grpc-router` command line entry point to start the server.
+* The server no longer enables `SO_REUSEPORT`: starting a second router on a port already in use now fails
+  instead of silently splitting the service register between the two processes.
+* New `grpc_router.server.create_server(config)` to build a server without blocking (`serve` still blocks).
+* `GRPCRouterClient` caches its stub, and gains `close()` and context manager support.
+* `GRPCRouterClient.HEALTh_PUSh_FREQUENCY_SECONDS` renamed to `HEALTH_PUSH_FREQUENCY_SECONDS`
+  (the old name is kept as a deprecated alias).
+* Fix the PushHealthStatus error message for an empty token ("service_token", was "service_context").
+* Fix a race where concurrent registrations could start more than one health check thread.
+* Ship type information (`py.typed` and generated `.pyi` stubs for the protobuf messages).
+* Packaging/tooling: `[build-system]` table, SPDX license metadata, PEP 735 dependency groups (`test`, `dev`),
+  ruff replaces flake8, updated GitHub Actions.
+
 ## 0.3.0 (2024-11-02)
 
 * Support for active client health check type (passive not yet implemented)

@@ -1,45 +1,43 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "grpc_router"
-version = "0.3.0"
+version = "0.4.0"
 description = "A simple grpc router to establish a simple grpc mesh."
 authors = [{name = "Ciprian Miclaus", email = "ciprianm@gmail.com"}]
 readme = "README.md"
-license = {file = "LICENSE"}
-requires-python = ">=3.9"
-classifiers=[
-    'Development Status :: 4 - Beta',
-    'Intended Audience :: Developers',
-    'License :: OSI Approved :: MIT License',
-    'Natural Language :: English',
-    'Programming Language :: Python :: 3',
-    'Programming Language :: Python :: 3.9',
-    'Programming Language :: Python :: 3.10',
-    'Programming Language :: Python :: 3.11',
-    'Programming Language :: Python :: 3.12',
-    'Programming Language :: Python :: 3.13',
+license = "MIT"
+license-files = ["LICENSE", "AUTHORS.md"]
+requires-python = ">=3.11"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Natural Language :: English",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Programming Language :: Python :: 3.15",
+    "Topic :: System :: Networking",
+    "Typing :: Typed",
 ]
 
+# Lower bounds are set by the checked-in generated code in grpc_router/stubs
+# (protobuf gencode 5.27.2, grpc gencode 1.66.2). Regenerating the stubs with a
+# newer grpcio-tools raises these minimums - see gen_stubs.sh.
 dependencies = [
-    "grpcio",
-    "grpcio-reflection",
-    "grpcio-health-checking",
-    "protobuf",
+    "grpcio>=1.66.2",
+    "grpcio-reflection>=1.66.2",
+    "grpcio-health-checking>=1.66.2",
+    "protobuf>=5.27.2",
 ]
 
-
-[project.optional-dependencies]
-test = [
-    "pytest",
-    ]
-
-dev = [
-    "grpcio-tools",
-    "tox",
-    "pre-commit",
-    "pip",
-    "twine",
-    "toml"
-]
+[project.scripts]
+grpc-router = "grpc_router.server:main"
 
 [project.urls]
 homepage = "https://github.com/ciprianmiclaus2/grpc_router"
@@ -47,5 +45,38 @@ documentation = "https://ciprianmiclaus2.github.io/grpc_router/"
 repository = "https://github.com/ciprianmiclaus2/grpc_router"
 history = "https://github.com/ciprianmiclaus2/grpc_router/blob/main/HISTORY.md"
 
-[tool.setuptools]
-packages = ["grpc_router"]
+[dependency-groups]
+test = [
+    "pytest>=8",
+    "pytest-cov",
+]
+dev = [
+    {include-group = "test"},
+    "grpcio-tools",
+    "build",
+    "ruff",
+]
+
+[tool.setuptools.packages.find]
+include = ["grpc_router*"]
+
+[tool.setuptools.package-data]
+grpc_router = ["py.typed", "stubs/*.pyi"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 127
+target-version = "py311"
+extend-exclude = ["grpc_router/stubs"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "B", "I", "UP", "SIM"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["E501"]
+
+[tool.coverage.run]
+source = ["grpc_router"]
+omit = ["grpc_router/stubs/*"]

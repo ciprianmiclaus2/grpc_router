@@ -127,7 +127,7 @@ def test_region_cross_region(grpc_router_server):
 def test_region_no_cross_region(grpc_router_server_no_global_region_no_cross_region):
     service_id = "my.region.no_cross_region.test.service"
 
-    client = GRPCRouterClient("localhost", 7652)
+    client = GRPCRouterClient("localhost", 7651)
 
     clients = [
         register_svc(service_id, "USEast", 1, 9000),
